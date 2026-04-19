@@ -1,10 +1,19 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { BullModule } from '@nestjs/bullmq';
+import { PrismaModule } from './prisma/Prisma.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    // Global Redis Configuration
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+
+      },
+    }),
+    PrismaModule,
+    JobsModule,
+  ],
 })
 export class AppModule {}
