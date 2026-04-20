@@ -1,40 +1,73 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
+import { ContentType } from '@prisma/client';
+import { TranscriptionService } from 'src/transcription/transcription.service';
+import { AIService } from 'src/ai/ai.service';
+
+const CONTENT_TYPES: ContentType[] = [
+  'TWITTER_THREAD',
+  'BLOG_POST',
+  'FACEBOOK_POST',
+];
 
 @Processor('repurpose-queue')
 export class JobsProcessor extends WorkerHost {
-  constructor(private prisma: PrismaService) {
+  private readonly logger = new Logger(JobsProcessor.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transcriptionService: TranscriptionService,
+    private readonly aiService: AIService,
+  ) {
     super();
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(job: Job<{ jobId: string; videoUrl: string }>): Promise<void> {
     const { jobId, videoUrl } = job.data;
+    this.logger.log(`Processing job ${jobId} for URL: ${videoUrl}`);
 
     try {
-      // Update DB to Processing
-      await this.prisma.job.update({
-        where: { id: jobId },
-        data: { status: 'PROCESSING' },
-      });
+      await this.setJobStatus(jobId, 'PROCESSING');
 
-      // TODO: Integration with YouTube Transcription Service
-      // TODO: Integration with AI Service (OpenAI/Anthropic)
-      
-      // Simulating work
-      await new Promise((res) => setTimeout(res, 5000));
+      // Step 1: Get transcript
+      const transcript =
+        await this.transcriptionService.getTranscript(videoUrl);
+      this.logger.log(`Transcript length: ${transcript.length} chars`);
 
-      await this.prisma.job.update({
-        where: { id: jobId },
-        data: { status: 'COMPLETED' },
-      });
+      // Step 2: Generate all content types in parallel
+      const results = await Promise.all(
+        CONTENT_TYPES.map(async (type) => {
+          const body = await this.aiService.generateContent(type, transcript);
+          return { type, body, jobId };
+        }),
+      );
 
-    } catch (error) {
-      await this.prisma.job.update({
-        where: { id: jobId },
-        data: { status: 'FAILED' },
-      });
+      // Step 3: Save results and mark job as COMPLETED atomically
+      await this.prisma.$transaction([
+        this.prisma.generatedContent.createMany({ data: results }),
+        this.prisma.job.update({
+          where: { id: jobId },
+          data: { status: 'COMPLETED' },
+        }),
+      ]);
+
+      this.logger.log(`Job ${jobId} completed successfully`);
+    } catch (error: any) {
+      this.logger.error(`Job ${jobId} failed: ${error.message}`, error.stack);
+
+      await this.setJobStatus(jobId, 'FAILED');
+
+      // Re-throw so BullMQ can retry based on the job's attempts config
       throw error;
     }
+  }
+
+  private async setJobStatus(jobId: string, status: 'PROCESSING' | 'FAILED') {
+    await this.prisma.job.update({
+      where: { id: jobId },
+      data: { status },
+    });
   }
 }

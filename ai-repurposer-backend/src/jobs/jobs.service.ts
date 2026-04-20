@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service'; 
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class JobsService {
@@ -17,13 +17,17 @@ export class JobsService {
     });
 
     // 2. Add to BullMQ
-    await this.repurposeQueue.add('process-video', {
-      jobId: job.id,
-      videoUrl: videoUrl,
-    }, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-    });
+    await this.repurposeQueue.add(
+      'process-video',
+      {
+        jobId: job.id,
+        videoUrl: videoUrl,
+      },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
+    );
 
     return job;
   }
