@@ -4,41 +4,28 @@ import {
   Body,
   Get,
   Param,
-  BadRequestException,
-  NotFoundException,
-  HttpCode,
-  HttpStatus,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('jobs')
 export class JobsController {
   constructor(private readonly jobsService: JobsService) {}
-
   @Post()
-  @HttpCode(HttpStatus.ACCEPTED)
-  async createJob(@Body() dto: CreateJobDto) {
-    if (!dto?.videoUrl) {
-      throw new BadRequestException('videoUrl is required');
-    }
-
-    const job = await this.jobsService.initiateJob(dto.videoUrl, dto.language);
-    return { jobId: job.id, status: job.status };
+  @UseGuards(AuthGuard('jwt'))
+  create(@Body() dto: CreateJobDto, @Req() req: Request) {
+    const user = req.user as { id: string };
+    return this.jobsService.initiateJob(dto.videoUrl, user.id, dto.language);
   }
 
   @Get(':id')
-  async getJobStatus(@Param('id') id: string) {
-    if (!id?.trim()) {
-      throw new BadRequestException('Job ID is required');
-    }
-
-    const job = await this.jobsService.getJobById(id);
-
-    if (!job) {
-      throw new NotFoundException(`Job with ID "${id}" not found`);
-    }
-
-    return job;
+  @UseGuards(AuthGuard('jwt'))
+  getJob(@Param('id') id: string, @Req() req: Request) {
+    const user = req.user as { id: string };
+    return this.jobsService.getJobById(id, user.id);
   }
 }

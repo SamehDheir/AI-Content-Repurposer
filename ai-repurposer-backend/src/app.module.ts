@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from './prisma/Prisma.module';
 import { JobsModule } from './jobs/jobs.module';
 import { ConfigModule } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
 
 
 @Module({
@@ -18,12 +19,13 @@ import { ConfigModule } from '@nestjs/config';
     }),
     BullModule.forRoot({
       connection: {
-        host: 'localhost', // طالما شغال على جهازك
+        host: 'localhost',
         port: 6379,
       },
     }),
     PrismaModule,
     JobsModule,
+    AuthModule
   ],
   controllers: [],
   providers: [],

@@ -12,33 +12,25 @@ export class JobsService {
 
   async initiateJob(
     videoUrl: string,
+    userId: string,
     language: 'Arabic' | 'English' = 'Arabic',
   ) {
-    // 1. Create entry in DB
     const job = await this.prisma.job.create({
-      data: { videoUrl, status: 'QUEUED', language: language },
+      data: { videoUrl, status: 'QUEUED', language, userId },
     });
 
-    // 2. Add to BullMQ
     await this.repurposeQueue.add(
       'process-video',
-      {
-        jobId: job.id,
-        videoUrl: videoUrl,
-        language: language,
-      },
-      {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-      },
+      { jobId: job.id, videoUrl, language },
+      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
     );
 
     return job;
   }
 
-  async getJobById(id: string) {
+  async getJobById(id: string, userId: string) {
     return this.prisma.job.findUnique({
-      where: { id },
+      where: { id,userId },
       include: { generatedContent: true },
     });
   }

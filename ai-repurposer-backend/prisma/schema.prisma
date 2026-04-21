@@ -7,6 +7,17 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String
+  name         String?
+  googleId     String?  @unique
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  jobs         Job[]
+}
+
 enum JobStatus {
   QUEUED
   PROCESSING
@@ -27,6 +38,8 @@ model Job {
   status           JobStatus          @default(QUEUED)
   language         String             @default("Arabic")
   createdAt        DateTime           @default(now())
+  userId           String
+  user             User               @relation(fields: [userId], references: [id])
   updatedAt        DateTime           @updatedAt
   generatedContent GeneratedContent[]
 
