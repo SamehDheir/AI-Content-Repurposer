@@ -28,9 +28,19 @@ export class JobsService {
     return job;
   }
 
-  async getJobById(id: string, userId: string) {
-    return this.prisma.job.findUnique({
-      where: { id,userId },
+  async getMyJobs(userId: string) {
+    return this.prisma.job.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        generatedContent: { select: { type: true, body: true } },
+      },
+    });
+  }
+
+  async getJob(jobId: string, userId: string) {
+    return this.prisma.job.findFirst({
+      where: { id: jobId, userId },
       include: { generatedContent: true },
     });
   }
