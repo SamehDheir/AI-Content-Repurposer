@@ -18,21 +18,30 @@ enum ContentType {
   TWITTER_THREAD
   BLOG_POST
   FACEBOOK_POST
+  HIGHLIGHTS
 }
 
 model Job {
   id               String             @id @default(uuid())
   videoUrl         String
   status           JobStatus          @default(QUEUED)
+  language         String             @default("Arabic")
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
   generatedContent GeneratedContent[]
+
+  @@index([status])
+  @@index([createdAt])
 }
 
 model GeneratedContent {
-  id    String      @id @default(uuid())
-  jobId String
-  type  ContentType
-  body  String      @db.Text
-  job   Job         @relation(fields: [jobId], references: [id])
+  id        String      @id @default(uuid())
+  jobId     String
+  type      ContentType
+  body      String      @db.Text
+  createdAt DateTime    @default(now())
+  job       Job         @relation(fields: [jobId], references: [id], onDelete: Cascade) // حذف المحتوى تلقائياً عند حذف الـ Job
+
+  @@unique([jobId, type])
+  @@index([jobId])
 }

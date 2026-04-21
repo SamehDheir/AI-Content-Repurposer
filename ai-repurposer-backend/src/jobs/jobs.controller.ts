@@ -23,7 +23,7 @@ export class JobsController {
       throw new BadRequestException('videoUrl is required');
     }
 
-    const job = await this.jobsService.initiateJob(dto.videoUrl);
+    const job = await this.jobsService.initiateJob(dto.videoUrl, dto.language);
     return { jobId: job.id, status: job.status };
   }
 

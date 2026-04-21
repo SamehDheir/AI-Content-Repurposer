@@ -10,10 +10,13 @@ export class JobsService {
     private prisma: PrismaService,
   ) {}
 
-  async initiateJob(videoUrl: string) {
+  async initiateJob(
+    videoUrl: string,
+    language: 'Arabic' | 'English' = 'Arabic',
+  ) {
     // 1. Create entry in DB
     const job = await this.prisma.job.create({
-      data: { videoUrl, status: 'QUEUED' },
+      data: { videoUrl, status: 'QUEUED', language: language },
     });
 
     // 2. Add to BullMQ
@@ -22,6 +25,7 @@ export class JobsService {
       {
         jobId: job.id,
         videoUrl: videoUrl,
+        language: language,
       },
       {
         attempts: 3,
