@@ -53,7 +53,7 @@ model GeneratedContent {
   type      ContentType
   body      String      @db.Text
   createdAt DateTime    @default(now())
-  job       Job         @relation(fields: [jobId], references: [id], onDelete: Cascade) // حذف المحتوى تلقائياً عند حذف الـ Job
+  job       Job         @relation(fields: [jobId], references: [id], onDelete: Cascade) 
 
   @@unique([jobId, type])
   @@index([jobId])

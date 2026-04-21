@@ -42,7 +42,7 @@ export class AIService {
 
     try {
       const response = await this.openrouter.chat.completions.create({
-        model: 'qwen/qwen3-8b:freeQwen/Qwen2.5-72B-Instruct', // مجاني تماماً
+        model: 'qwen/qwen3-8b:freeQwen/Qwen2.5-72B-Instruct',
         max_tokens: 1500,
         temperature: 0.7,
         messages: [

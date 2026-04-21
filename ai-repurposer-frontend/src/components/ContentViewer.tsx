@@ -10,12 +10,10 @@ const TABS: { key: ContentType; label: string }[] = [
   { key: "HIGHLIGHTS", label: "Highlights" },
 ];
 
-// دالة لفصل التغريدات
 function parseTweets(text: string): string[] {
   return text.split(/\n\s*\n/).filter((t) => t.trim());
 }
 
-// دالة لاستخراج الـ Hashtags
 function extractHashtags(text: string): string[] {
   const regex = /#\w+/g;
   return (text.match(regex) || []).filter(
@@ -23,16 +21,13 @@ function extractHashtags(text: string): string[] {
   );
 }
 
-// دالة لاستخراج Hook (أول فقرة)
 function extractHook(text: string): string {
   const lines = text.split(/\n/).filter((l) => l.trim());
   return lines[0] || "";
 }
 
-// دالة لمعالجة Blog - تحويل Markdown-style إلى HTML
 function renderBlogContent(text: string) {
   return text.split(/\n\n+/).map((para, idx) => {
-    // عناوين بصيغة # أو ##
     if (para.startsWith("## ")) {
       return (
         <h2 key={idx} className="text-xl font-bold text-gray-900 mt-6 mb-3">
@@ -47,7 +42,6 @@ function renderBlogContent(text: string) {
         </h1>
       );
     }
-    // نقاط (bullets)
     if (para.startsWith("- ") || para.startsWith("• ")) {
       return (
         <ul
@@ -65,7 +59,6 @@ function renderBlogContent(text: string) {
         </ul>
       );
     }
-    // فقرات عادية
     return (
       <p key={idx} className="text-gray-800 leading-relaxed mb-4">
         {para}
@@ -74,7 +67,6 @@ function renderBlogContent(text: string) {
   });
 }
 
-// دالة معالجة Highlights
 function parseHighlights(text: string): { title: string; content: string }[] {
   const items = text.split(/\n(?=[•\-\d])/);
   return items.map((item) => {
@@ -113,7 +105,6 @@ export function ContentViewer({
     setIsEditing(false);
   };
 
-  // معالجة text selection و floating toolbar
   const handleTextSelection = () => {
     const selection = window.getSelection();
     if (selection && selection.toString().length > 0) {

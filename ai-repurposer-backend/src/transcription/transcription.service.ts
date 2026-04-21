@@ -23,7 +23,6 @@ export class TranscriptionService {
 
     this.logger.log(`Fetching transcript for video: ${videoId}`);
 
-    // Strategy 1: Captions (مجاني 100%)
     try {
       const transcript = await this.fetchCaptions(videoId);
       if (transcript && transcript.trim().length > 20) {
@@ -61,7 +60,6 @@ export class TranscriptionService {
     videoUrl: string,
     videoId: string,
   ): Promise<string> {
-    // webm بدون تحويل — لا يحتاج ffmpeg
     const tmpFile = path.join(os.tmpdir(), `yt-audio-${videoId}.webm`);
 
     try {

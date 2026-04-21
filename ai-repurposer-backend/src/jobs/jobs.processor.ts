@@ -36,7 +36,6 @@ export class JobsProcessor extends WorkerHost {
     this.logger.log(`Processing job ${jobId} for URL: ${videoUrl}`);
 
     try {
-      // تحقق إن الـ job موجود قبل أي عملية
       const existingJob = await this.prisma.job.findUnique({
         where: { id: jobId },
       });
@@ -46,7 +45,6 @@ export class JobsProcessor extends WorkerHost {
         return;
       }
 
-      // تجاهل لو اتشتغل قبل
       if (existingJob.status === 'COMPLETED') {
         this.logger.warn(`Job ${jobId} already COMPLETED — skipping`);
         return;
@@ -73,7 +71,6 @@ export class JobsProcessor extends WorkerHost {
 
       // Step 3: Save results and mark job as COMPLETED atomically
       await this.prisma.$transaction([
-        // احذف أي محتوى قديم لو كان في retry
         this.prisma.generatedContent.deleteMany({ where: { jobId } }),
         this.prisma.generatedContent.createMany({ data: results }),
         this.prisma.job.update({

@@ -82,7 +82,6 @@ export default function DashboardPage() {
               job={job}
               onUpdate={(updated) => {
                 updateJob(updated);
-                // لو اكتمل، افتح المحتوى تلقائياً
                 if (updated.status === 'COMPLETED') setSelected(updated);
               }}
               onView={setSelected}
