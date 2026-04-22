@@ -6,10 +6,11 @@ import { JobsProcessor } from './jobs.processor';
 import { TranscriptionService } from 'src/transcription/transcription.service';
 import { AIService } from 'src/ai/ai.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { UsageModule } from '../usage/usage.module';
 import { JwtModule } from '@nestjs/jwt';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: 'repurpose-queue' }), JwtModule],
+  imports: [BullModule.registerQueue({ name: 'repurpose-queue' }), JwtModule, UsageModule],
   controllers: [JobsController],
   providers: [
     JobsService,

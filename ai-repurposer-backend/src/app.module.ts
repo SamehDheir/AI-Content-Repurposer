@@ -5,15 +5,11 @@ import { JobsModule } from './jobs/jobs.module';
 import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { UsersController } from './users/users.controller';
+import { RedisModule } from './redis/redis.module';
+import { UsageModule } from './usage/usage.module';
 
 @Module({
   imports: [
-    // BullModule.forRoot({
-    //   connection: {
-    //     host: process.env.REDIS_HOST || 'localhost',
-    //     port: parseInt(process.env.REDIS_PORT) || 6379,
-    //     password: process.env.REDIS_PASSWORD,
-    //   },
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -26,6 +22,8 @@ import { UsersController } from './users/users.controller';
     PrismaModule,
     JobsModule,
     AuthModule,
+    RedisModule,
+    UsageModule
   ],
   controllers: [UsersController],
   providers: [],

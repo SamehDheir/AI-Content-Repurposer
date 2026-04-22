@@ -1,13 +1,15 @@
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { UsageService } from '../usage/usage.service';
 
 @Injectable()
 export class JobsService {
   constructor(
     @InjectQueue('repurpose-queue') private repurposeQueue: Queue,
     private readonly prisma: PrismaService,
+    private readonly usage: UsageService, // ← أضف
   ) {}
 
   async initiateJob(
@@ -15,15 +17,9 @@ export class JobsService {
     userId: string,
     language: 'Arabic' | 'English' = 'Arabic',
   ) {
-    const [job] = await this.prisma.$transaction([
-      this.prisma.job.create({
-        data: { videoUrl, status: 'QUEUED', language, userId },
-      }),
-      this.prisma.user.update({
-        where: { id: userId },
-        data: { jobsUsedThisMonth: { increment: 1 } },
-      }),
-    ]);
+    const job = await this.prisma.job.create({
+      data: { videoUrl, status: 'QUEUED', language, userId },
+    });
 
     await this.repurposeQueue.add(
       'process-video',
@@ -31,12 +27,15 @@ export class JobsService {
       { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
     );
 
+    // Increment usage only after queue confirms job is added
+    await this.usage.increment(userId);
+
     return job;
   }
 
   async getMyJobs(userId: string) {
     return this.prisma.job.findMany({
-      where: { userId },
+      where:   { userId },
       orderBy: { createdAt: 'desc' },
       include: { generatedContent: { select: { type: true, body: true } } },
     });
@@ -44,7 +43,7 @@ export class JobsService {
 
   async getJob(jobId: string, userId: string) {
     return this.prisma.job.findFirst({
-      where: { id: jobId, userId },
+      where:   { id: jobId, userId },
       include: { generatedContent: true },
     });
   }
