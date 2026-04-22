@@ -44,6 +44,8 @@ export const api = {
 
   getMyJobs: () => request<Job[]>("/jobs"),
   getJob: (id: string) => request<Job>(`/jobs/${id}`),
+
+  getMe: () => request<any>("/users/me"),
 };
 
 // ── Types ──────────────────────────────────────────────────

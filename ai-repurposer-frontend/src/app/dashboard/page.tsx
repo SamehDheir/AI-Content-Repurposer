@@ -1,14 +1,15 @@
-'use client';
-import { useState } from 'react';
-import { useJobs } from '@/src/hooks/useJobs';
-import { api, type Job } from '@/src/lib/api';
-import { JobCard } from '@/src/components/JobCard';
-import { ContentViewer } from '@/src/components/ContentViewer';
+"use client";
+import { useState } from "react";
+import { useJobs } from "@/src/hooks/useJobs";
+import { api, type Job } from "@/src/lib/api";
+import { JobCard } from "@/src/components/JobCard";
+import { ContentViewer } from "@/src/components/ContentViewer";
+import { UsageBanner } from "@/src/components/UsageBanner";
 
 export default function DashboardPage() {
   const { jobs, loading, error, refetch, updateJob } = useJobs();
-  const [url, setUrl]           = useState('');
-  const [lang, setLang]         = useState<'Arabic' | 'English'>('Arabic');
+  const [url, setUrl] = useState("");
+  const [lang, setLang] = useState<"Arabic" | "English">("Arabic");
   const [submitting, setSubmit] = useState(false);
   const [selected, setSelected] = useState<Job | null>(null);
 
@@ -18,7 +19,7 @@ export default function DashboardPage() {
     setSubmit(true);
     try {
       await api.createJob(url.trim(), lang);
-      setUrl('');
+      setUrl("");
       await refetch();
     } catch (err: any) {
       alert(err.message);
@@ -32,7 +33,10 @@ export default function DashboardPage() {
       <header className="bg-white border-b px-6 py-4 flex justify-between items-center">
         <h1 className="text-xl font-semibold text-gray-900">AI Repurposer</h1>
         <button
-          onClick={() => { localStorage.clear(); location.href = '/login'; }}
+          onClick={() => {
+            localStorage.clear();
+            location.href = "/login";
+          }}
           className="text-sm text-gray-500 hover:text-gray-700"
         >
           Sign out
@@ -40,6 +44,7 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <UsageBanner />
 
         {/* New job */}
         <div className="bg-white rounded-xl border p-6">
@@ -53,7 +58,7 @@ export default function DashboardPage() {
             />
             <select
               value={lang}
-              onChange={(e) => setLang(e.target.value as 'Arabic' | 'English')}
+              onChange={(e) => setLang(e.target.value as "Arabic" | "English")}
               className="px-3 py-2 rounded-lg border text-sm focus:outline-none"
             >
               <option value="Arabic">عربي</option>
@@ -64,7 +69,7 @@ export default function DashboardPage() {
               disabled={submitting || !url.trim()}
               className="px-5 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
             >
-              {submitting ? '...' : 'Generate'}
+              {submitting ? "..." : "Generate"}
             </button>
           </form>
         </div>
@@ -72,7 +77,7 @@ export default function DashboardPage() {
         {/* Jobs */}
         <div className="space-y-2">
           {loading && <p className="text-sm text-gray-400">Loading...</p>}
-          {error   && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-red-500">{error}</p>}
           {!loading && jobs.length === 0 && (
             <p className="text-sm text-gray-400">No jobs yet.</p>
           )}
@@ -82,7 +87,7 @@ export default function DashboardPage() {
               job={job}
               onUpdate={(updated) => {
                 updateJob(updated);
-                if (updated.status === 'COMPLETED') setSelected(updated);
+                if (updated.status === "COMPLETED") setSelected(updated);
               }}
               onView={setSelected}
             />

@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class JobsService {
   constructor(
     @InjectQueue('repurpose-queue') private repurposeQueue: Queue,
-    private prisma: PrismaService,
+    private readonly prisma: PrismaService,
   ) {}
 
   async initiateJob(
@@ -15,9 +15,15 @@ export class JobsService {
     userId: string,
     language: 'Arabic' | 'English' = 'Arabic',
   ) {
-    const job = await this.prisma.job.create({
-      data: { videoUrl, status: 'QUEUED', language, userId },
-    });
+    const [job] = await this.prisma.$transaction([
+      this.prisma.job.create({
+        data: { videoUrl, status: 'QUEUED', language, userId },
+      }),
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { jobsUsedThisMonth: { increment: 1 } },
+      }),
+    ]);
 
     await this.repurposeQueue.add(
       'process-video',
@@ -32,9 +38,7 @@ export class JobsService {
     return this.prisma.job.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: {
-        generatedContent: { select: { type: true, body: true } },
-      },
+      include: { generatedContent: { select: { type: true, body: true } } },
     });
   }
 

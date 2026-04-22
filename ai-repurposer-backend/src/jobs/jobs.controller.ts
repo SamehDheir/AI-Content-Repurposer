@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import { Observable, interval } from 'rxjs';
 import { switchMap, takeWhile, map } from 'rxjs/operators';
 import { JobsService } from './jobs.service';
+import { UsageLimitGuard } from 'src/guards/usage-limit.guard';
 
 @Controller('jobs')
 export class JobsController {
@@ -26,7 +27,7 @@ export class JobsController {
   ) {}
 
   @Post()
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), UsageLimitGuard) // ← أضف UsageLimitGuard
   create(
     @Body() body: { videoUrl: string; language?: 'Arabic' | 'English' },
     @Req() req: Request,
