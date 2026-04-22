@@ -8,9 +8,10 @@ import { AIService } from 'src/ai/ai.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UsageModule } from '../usage/usage.module';
 import { JwtModule } from '@nestjs/jwt';
+import { ImageModule } from '../image/image.module';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: 'repurpose-queue' }), JwtModule, UsageModule],
+  imports: [BullModule.registerQueue({ name: 'repurpose-queue' }), JwtModule, UsageModule, ImageModule],
   controllers: [JobsController],
   providers: [
     JobsService,

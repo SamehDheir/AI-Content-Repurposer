@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ContentType } from '@prisma/client';
 import { TranscriptionService } from 'src/transcription/transcription.service';
 import { AIService } from 'src/ai/ai.service';
+import { ImageService } from 'src/image/image.service';
 
 const CONTENT_TYPES: ContentType[] = [
   'TWITTER_THREAD',
@@ -21,6 +22,7 @@ export class JobsProcessor extends WorkerHost {
     private readonly prisma: PrismaService,
     private readonly transcriptionService: TranscriptionService,
     private readonly aiService: AIService,
+    private readonly imageService: ImageService,
   ) {
     super();
   }
@@ -33,6 +35,12 @@ export class JobsProcessor extends WorkerHost {
     }>,
   ): Promise<void> {
     const { jobId, videoUrl, language = 'Arabic' } = job.data;
+    const videoId = this.extractVideoId(videoUrl);
+    
+    if (!videoId) {
+      throw new Error('Invalid YouTube URL - could not extract video ID');
+    }
+    
     this.logger.log(`Processing job ${jobId} for URL: ${videoUrl}`);
 
     try {
@@ -52,10 +60,31 @@ export class JobsProcessor extends WorkerHost {
 
       await this.setJobStatus(jobId, 'PROCESSING');
 
-      // Step 1: Get transcript
-      const transcript =
-        await this.transcriptionService.getTranscript(videoUrl);
-      this.logger.log(`Transcript length: ${transcript.length} chars`);
+      // Step 1: Get transcript with retry logic
+      let transcript: string;
+      let transcriptSuccess = false;
+      
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          if (attempt === 1) {
+            transcript = await this.transcriptionService.getTranscript(videoUrl);
+          } else {
+            transcript = await this.transcriptionService.retryTranscription(videoUrl, videoId, attempt);
+          }
+          this.logger.log(`Transcript length: ${transcript.length} chars`);
+          transcriptSuccess = true;
+          break;
+        } catch (error: any) {
+          this.logger.error(`Transcription attempt ${attempt} failed: ${error.message}`);
+          if (attempt === 3) {
+            throw error;
+          }
+          this.logger.log(`Retrying transcription... (${attempt + 1}/3)`);
+        }
+      }
+
+      // Cleanup audio file after successful transcription or max attempts
+      await this.transcriptionService.cleanupAudioFile(videoId);
 
       // Step 2: Generate all content types in parallel
       const results = await Promise.all(
@@ -69,7 +98,7 @@ export class JobsProcessor extends WorkerHost {
         }),
       );
 
-      // Step 3: Save results and mark job as COMPLETED atomically
+      // Step 3: Save text content and mark job as COMPLETED
       await this.prisma.$transaction([
         this.prisma.generatedContent.deleteMany({ where: { jobId } }),
         this.prisma.generatedContent.createMany({ data: results }),
@@ -79,9 +108,13 @@ export class JobsProcessor extends WorkerHost {
         }),
       ]);
 
-      this.logger.log(`✅ Job ${jobId} completed successfully`);
+      this.logger.log(`✅ Job ${jobId} completed successfully (text saved)`);
     } catch (error: any) {
       this.logger.error(`Job ${jobId} failed: ${error.message}`, error.stack);
+      
+      // Cleanup audio file on failure
+      await this.transcriptionService.cleanupAudioFile(videoId);
+      
       await this.setJobStatus(jobId, 'FAILED').catch((e) =>
         this.logger.error(`Failed to update status: ${e.message}`),
       );
@@ -94,5 +127,15 @@ export class JobsProcessor extends WorkerHost {
       where: { id: jobId },
       data: { status },
     });
+  }
+
+  private extractVideoId(url: string): string | null {
+    if (!url) return null;
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
+
+    const regExp =
+      /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
+    const match = url.match(regExp);
+    return match ? match[1] : null;
   }
 }

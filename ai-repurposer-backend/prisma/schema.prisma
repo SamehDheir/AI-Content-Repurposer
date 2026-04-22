@@ -49,6 +49,7 @@ model Job {
   userId           String
   user             User               @relation(fields: [userId], references: [id])
   updatedAt        DateTime           @updatedAt
+  imageUrl         String?
   generatedContent GeneratedContent[]
 
   @@index([status])

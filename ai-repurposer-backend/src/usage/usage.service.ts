@@ -14,9 +14,7 @@ export class UsageService {
       const count = await this.redis.increment(key);
 
       if (count === 1) {
-        // Redis expects Unix timestamp in SECONDS, not milliseconds
-        const expireTimestamp = Math.floor(nextMonthStart().getTime() / 1000);
-        await this.redis.expireAt(key, expireTimestamp).catch(e => {
+        await this.redis.expireAt(key, nextMonthStart()).catch(e => {
           this.logger.warn(`Failed to set expiry for key ${key}: ${e.message}`);
         });
       }

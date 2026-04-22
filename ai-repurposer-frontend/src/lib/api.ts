@@ -45,6 +45,11 @@ export const api = {
   getMyJobs: () => request<Job[]>("/jobs"),
   getJob: (id: string) => request<Job>(`/jobs/${id}`),
 
+  generateImageForJob: (jobId: string) =>
+    request<{ imageUrl: string }>(`/jobs/${jobId}/generate-image`, {
+      method: "POST",
+    }),
+
   getMe: () => request<any>("/users/me"),
 };
 
@@ -67,5 +72,6 @@ export interface Job {
   status: JobStatus;
   language: string;
   createdAt: string;
+  imageUrl?: string;
   generatedContent: GeneratedContent[];
 }

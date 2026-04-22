@@ -25,12 +25,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-::placeholder {
-  color: #110ee9;
-  opacity: 0.5;
-}
 
-select {
-  color: #110ee9;
-  border-color: black;
-}
+
+

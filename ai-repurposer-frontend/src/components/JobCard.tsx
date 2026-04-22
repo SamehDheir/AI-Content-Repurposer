@@ -1,7 +1,7 @@
 "use client";
 import { type Job, type JobStatus } from "@/src/lib/api";
 import { useJobSSE } from "@/src/hooks/useJobSSE";
-import { ExternalLink, Loader2, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { ExternalLink, Loader2, CheckCircle2, XCircle, Clock, Image as ImageIcon } from "lucide-react";
 
 const STATUS_CONFIG: Record<JobStatus, {
   label: string;
@@ -67,7 +67,12 @@ export function JobCard({ job, onUpdate, onView }: Props) {
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-zinc-200 truncate font-medium">{job.videoUrl}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-zinc-200 truncate font-medium">{job.videoUrl}</p>
+          {job.imageUrl && (
+            <ImageIcon size={12} className="text-indigo-400 shrink-0" />
+          )}
+        </div>
         <p className="text-xs text-zinc-600 mt-0.5">
           {new Date(job.createdAt).toLocaleString()} · {job.language}
         </p>

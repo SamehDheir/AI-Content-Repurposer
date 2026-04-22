@@ -18,7 +18,6 @@ export class UsageLimitGuard implements CanActivate {
     const req    = context.switchToHttp().getRequest();
     const user   = req.user as { id: string };
 
-    // اجلب الخطة من DB
     const dbUser = await this.prisma.user.findUnique({
       where:  { id: user.id },
       select: { plan: true },

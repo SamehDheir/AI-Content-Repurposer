@@ -33,9 +33,20 @@ export class TranscriptionService {
       this.logger.warn(`⚠️ No captions available: ${err.message}`);
     }
 
-    // Strategy 2: Groq Whisper (بدون ffmpeg)
     this.logger.log('🎙️ Falling back to Whisper transcription...');
-    return await this.transcribeWithWhisper(videoUrl, videoId);
+    return await this.transcribeWithWhisper(videoUrl, videoId, 1);
+  }
+
+  async retryTranscription(videoUrl: string, videoId: string, attempt: number): Promise<string> {
+    return await this.transcribeWithWhisper(videoUrl, videoId, attempt, true);
+  }
+
+  async cleanupAudioFile(videoId: string): Promise<void> {
+    const tmpFile = path.join(os.tmpdir(), `yt-audio-${videoId}.webm`);
+    if (fs.existsSync(tmpFile)) {
+      fs.unlinkSync(tmpFile);
+      this.logger.log(`🗑️ Audio file deleted: ${tmpFile}`);
+    }
   }
 
   private async fetchCaptions(videoId: string): Promise<string> {
@@ -59,28 +70,34 @@ export class TranscriptionService {
   private async transcribeWithWhisper(
     videoUrl: string,
     videoId: string,
+    attempt: number = 1,
+    useExistingFile: boolean = false,
   ): Promise<string> {
     const tmpFile = path.join(os.tmpdir(), `yt-audio-${videoId}.webm`);
 
     try {
-      this.logger.log(`⬇️ Downloading audio via yt-dlp (no ffmpeg)...`);
+      if (!useExistingFile || !fs.existsSync(tmpFile)) {
+        this.logger.log(`⬇️ Downloading audio via yt-dlp (no ffmpeg)...`);
 
-      await execAsync(
-        `yt-dlp --js-runtimes nodejs` +
-        ` -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"` +
-        ` --no-playlist` +
-        ` -o "${tmpFile}"` +
-        ` "${videoUrl}"`,
-      );
+        await execAsync(
+          `yt-dlp --js-runtimes nodejs` +
+          ` -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"` +
+          ` --no-playlist` +
+          ` -o "${tmpFile}"` +
+          ` "${videoUrl}"`,
+        );
 
-      const fileSizeMB = fs.statSync(tmpFile).size / (1024 * 1024);
-      this.logger.log(`📦 Audio size: ${fileSizeMB.toFixed(1)} MB`);
+        const fileSizeMB = fs.statSync(tmpFile).size / (1024 * 1024);
+        this.logger.log(`📦 Audio size: ${fileSizeMB.toFixed(1)} MB`);
 
-      if (fileSizeMB > 24) {
-        throw new Error(`Audio too large: ${fileSizeMB.toFixed(1)}MB (max 24MB)`);
+        if (fileSizeMB > 24) {
+          throw new Error(`Audio too large: ${fileSizeMB.toFixed(1)}MB (max 24MB)`);
+        }
+      } else {
+        this.logger.log(`📁 Using existing audio file (attempt ${attempt})`);
       }
 
-      this.logger.log(`📤 Sending to Groq Whisper...`);
+      this.logger.log(`📤 Sending to Groq Whisper (attempt ${attempt})...`);
 
       const transcription = await this.groq.audio.transcriptions.create({
         file: fs.createReadStream(tmpFile),
@@ -100,9 +117,15 @@ export class TranscriptionService {
       this.logger.log(`✅ Whisper done. Length: ${result.length} chars`);
       return result.trim();
     } finally {
-      if (fs.existsSync(tmpFile)) {
-        fs.unlinkSync(tmpFile);
-        this.logger.log(`🗑️ Temp file deleted`);
+      // Only delete file on success or after max attempts
+      if (useExistingFile && attempt >= 3) {
+        if (fs.existsSync(tmpFile)) {
+          fs.unlinkSync(tmpFile);
+          this.logger.log(`🗑️ Audio file deleted after ${attempt} attempts`);
+        }
+      } else if (!useExistingFile) {
+        // First attempt - keep file for potential retry
+        this.logger.log(`📁 Keeping audio file for potential retry`);
       }
     }
   }

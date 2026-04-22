@@ -63,7 +63,7 @@ export class AIService {
 
     try {
       const response = await this.openrouter.chat.completions.create({
-        model: 'qwen/qwen-2.5-72b-instruct:free',
+        model: 'meta-llama/llama-3.1-8b-instruct',
         max_tokens: 2000,
         temperature: 0.7,
         messages: [
@@ -95,7 +95,7 @@ export class AIService {
     } catch (error: any) {
       this.logger.error(`❌ AI Generation Failed: ${error.message}`);
       if (error.status === 429) {
-        throw new Error('الخدمة مزدحمة حالياً، يرجى المحاولة بعد دقيقة.');
+        throw new Error('The service is currently busy, please try again in a minute');
       }
       throw new Error(`AI generation failed: ${error.message}`);
     }

@@ -9,7 +9,7 @@ export class JobsService {
   constructor(
     @InjectQueue('repurpose-queue') private repurposeQueue: Queue,
     private readonly prisma: PrismaService,
-    private readonly usage: UsageService, // ← أضف
+    private readonly usage: UsageService, 
   ) {}
 
   async initiateJob(
@@ -45,6 +45,13 @@ export class JobsService {
     return this.prisma.job.findFirst({
       where:   { id: jobId, userId },
       include: { generatedContent: true },
+    });
+  }
+
+  async updateJobImageUrl(jobId: string, imageUrl: string) {
+    return this.prisma.job.update({
+      where: { id: jobId },
+      data: { imageUrl },
     });
   }
 }

@@ -80,7 +80,7 @@ export default function DashboardPage() {
                 onChange={(e) => setLang(e.target.value as "Arabic" | "English")}
                 className="px-3 py-2.5 rounded-xl bg-zinc-800 border border-white/10 text-sm text-zinc-300 focus:outline-none focus:border-indigo-500/60 transition-all cursor-pointer"
               >
-                <option value="Arabic">عربي</option>
+                <option value="Arabic">Arabic</option>
                 <option value="English">English</option>
               </select>
             </div>
@@ -163,7 +163,14 @@ export default function DashboardPage() {
       </main>
 
       {selected && (
-        <ContentViewer job={selected} onClose={() => setSelected(null)} />
+        <ContentViewer 
+          job={selected} 
+          onClose={() => setSelected(null)} 
+          onJobUpdate={(updated) => {
+            setSelected(updated);
+            updateJob(updated);
+          }}
+        />
       )}
     </div>
   );

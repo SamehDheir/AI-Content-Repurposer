@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersController } from './users/users.controller';
 import { RedisModule } from './redis/redis.module';
 import { UsageModule } from './usage/usage.module';
+import { ImageModule } from './image/image.module';
 
 @Module({
   imports: [
@@ -23,7 +24,8 @@ import { UsageModule } from './usage/usage.module';
     JobsModule,
     AuthModule,
     RedisModule,
-    UsageModule
+    UsageModule,
+    ImageModule
   ],
   controllers: [UsersController],
   providers: [],
