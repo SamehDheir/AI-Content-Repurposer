@@ -29,21 +29,39 @@ export class ImageService {
   ): Promise<string> {
     const {
       width  = 1280,
-      height = 720,  
+      height = 720,
       seed   = Math.floor(Math.random() * 999999),
     } = options ?? {};
 
     const encoded = encodeURIComponent(prompt);
-    const url =
+    const longUrl =
       `${this.baseUrl}/${encoded}` +
       `?width=${width}&height=${height}` +
-      `&model=flux` +          
+      `&model=flux` +
       `&seed=${seed}` +
       `&nologo=true` +
-      `&enhance=true`;        
+      `&enhance=true`;
 
     this.logger.log(`🎨 Image URL generated`);
-    return url;
+
+    // Shorten the URL using tinyurl
+    try {
+      const shortUrl = await this.shortenUrl(longUrl);
+      this.logger.log(`🔗 URL shortened: ${shortUrl}`);
+      return shortUrl;
+    } catch (error) {
+      this.logger.warn(`⚠️ Failed to shorten URL, using original: ${error}`);
+      return longUrl;
+    }
+  }
+
+  private async shortenUrl(longUrl: string): Promise<string> {
+    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+    if (!response.ok) {
+      throw new Error(`TinyURL API failed: ${response.statusText}`);
+    }
+    const shortUrl = await response.text();
+    return shortUrl;
   }
 
   private async buildSmartPrompt(

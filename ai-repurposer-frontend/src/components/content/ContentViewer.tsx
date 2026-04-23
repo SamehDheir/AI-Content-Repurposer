@@ -7,6 +7,7 @@ import { TwitterContent }    from "./TwitterContent";
 import { BlogContent }       from "./BlogContent";
 import { FacebookContent }   from "./FacebookContent";
 import { HighlightsContent } from "./HighlightsContent";
+import { useTheme } from "@/src/contexts/ThemeContext";
 
 interface Props {
   job:     Job;
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
+  const { theme } = useTheme();
   const [tab, setTab]         = useState<ContentType>("TWITTER_THREAD");
   const [copied, setCopied]   = useState(false);
   const [editedBodies, setEditedBodies] = useState<Partial<Record<ContentType, string>>>({});
@@ -82,28 +84,32 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/70 backdrop-blur-sm"
       onClick={handleBackdrop}
     >
       <div
-        className="relative w-full max-w-2xl max-h-[88vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl"
-        style={{ background: "var(--cv-bg, #141416)", border: "1px solid rgba(255,255,255,0.08)" }}
+        className={`relative w-full max-w-2xl max-h-[90vh] md:max-h-[88vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl ${
+          theme === 'dark' ? 'bg-[#141416] border-white/8' : 'bg-white border-gray-200'
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Subtle top glow */}
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent pointer-events-none" />
 
         {/* ── Header ── */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/8">
+        <div className={`flex items-center justify-between px-4 md:px-5 py-3 md:py-4 border-b ${theme === 'dark' ? 'border-white/8' : 'border-gray-200'}`}>
           <div className="flex items-center gap-2.5">
             <div className="w-2 h-2 rounded-full bg-indigo-500/70" />
-            <span className="text-sm font-semibold text-zinc-100 tracking-tight">
+            <span className={`text-sm font-semibold tracking-tight ${theme === 'dark' ? 'text-zinc-100' : 'text-gray-900'}`}>
               Generated content
             </span>
           </div>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-white/10 transition-all"
+            className={`w-8 h-8 md:w-7 md:h-7 rounded-lg flex items-center justify-center transition-all ${
+              theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300 hover:bg-white/10' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+            }`}
+            aria-label="Close"
           >
             <X size={15} />
           </button>
@@ -111,7 +117,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
 
         {/* ── Generated Image ── */}
         {(localImageUrl || job.imageUrl || generatingImage) && (
-          <div className="px-5 py-3 border-b border-white/8 bg-zinc-900/50">
+          <div className={`px-5 py-3 border-b ${theme === 'dark' ? 'border-white/8' : 'border-gray-200'} bg-zinc-900/50`}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <ImageIcon size={12} className="text-indigo-400" />
@@ -162,7 +168,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
         )}
 
         {/* ── Tabs ── */}
-        <div className="flex items-center gap-1 px-5 pt-3 pb-0 border-b border-white/8">
+        <div className={`flex items-center gap-1 px-4 md:px-5 pt-3 pb-0 border-b ${theme === 'dark' ? 'border-white/8' : 'border-gray-200'}`}>
           {TABS.map((t) => {
             const hasContent = !!getBody(t.key);
             const isActive   = tab === t.key;
@@ -171,16 +177,17 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                 key={t.key}
                 onClick={() => setTab(t.key)}
                 disabled={!hasContent}
-                className={`relative flex items-center gap-1.5 px-3 py-2 mb-[-1px] text-xs font-medium transition-all rounded-t-lg ${
+                className={`relative flex items-center gap-1.5 px-2 md:px-3 py-2 -mb-px text-xs font-medium transition-all rounded-t-lg ${
                   isActive
-                    ? "text-zinc-100 bg-white/8 border border-white/10 border-b-[var(--cv-bg,#141416)]"
+                    ? `${theme === 'dark' ? 'text-zinc-100 bg-white/8 border-white/10' : 'text-gray-900 bg-gray-100 border-gray-300'} border-b-${theme === 'dark' ? '[#141416]' : 'white'}`
                     : hasContent
-                    ? "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-                    : "text-zinc-700 cursor-not-allowed"
+                    ? `${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`
+                    : `${theme === 'dark' ? 'text-zinc-700' : 'text-gray-400'} cursor-not-allowed`
                 }`}
+                aria-label={`Switch to ${t.label} tab`}
               >
                 <span className="text-[11px] opacity-70">{t.icon}</span>
-                {t.label}
+                <span className="hidden sm:inline">{t.label}</span>
                 {isActive && (
                   <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-indigo-500 rounded-full" />
                 )}
@@ -190,10 +197,12 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
         </div>
 
         {/* ── Content area ── */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+        <div className={`flex-1 overflow-y-auto px-4 md:px-5 py-4 md:py-5 scrollbar-thin scrollbar-track-transparent ${
+          theme === 'dark' ? 'scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20' : 'scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400'
+        }`}>
           {!body ? (
             <div className="flex items-center justify-center h-32">
-              <p className="text-sm text-zinc-600">No content available.</p>
+              <p className={`text-sm ${theme === 'dark' ? 'text-zinc-600' : 'text-gray-500'}`}>No content available.</p>
             </div>
           ) : (
             <>
@@ -206,14 +215,16 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
         </div>
 
         {/* ── Footer ── */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-white/8 bg-white/3">
+        <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 px-4 md:px-5 py-3 md:py-3.5 border-t ${
+          theme === 'dark' ? 'border-white/8 bg-white/3' : 'border-gray-200 bg-gray-50'
+        }`}>
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
-            <span className="text-xs text-zinc-600">
+            <span className={`text-xs ${theme === 'dark' ? 'text-zinc-600' : 'text-gray-500'}`}>
               {body.length.toLocaleString()} chars
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             {!localImageUrl && !job.imageUrl && (
               <button
                 onClick={handleGenerateImage}
@@ -222,7 +233,8 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                   generatingImage
                     ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
                     : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
-                }`}
+                } min-h-[44px]`}
+                aria-label="Generate image"
               >
                 {generatingImage ? (
                   <>
@@ -232,7 +244,8 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                 ) : (
                   <>
                     <Sparkles size={13} />
-                    Generate Image
+                    <span className="hidden sm:inline">Generate Image</span>
+                    <span className="sm:hidden">Generate</span>
                   </>
                 )}
               </button>
@@ -243,10 +256,12 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                 copied
                   ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                   : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
-              }`}
+              } min-h-[44px]`}
+              aria-label="Copy content"
             >
               {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? "Copied!" : "Copy all"}
+              <span className="hidden sm:inline">{copied ? "Copied!" : "Copy all"}</span>
+              <span className="sm:hidden">{copied ? "Copied" : "Copy"}</span>
             </button>
           </div>
         </div>
