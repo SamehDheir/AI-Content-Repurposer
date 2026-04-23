@@ -71,4 +71,22 @@ export class AuthController {
       `${frontendUrl}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`,
     );
   }
+
+  // ── Email Verification ────────────────────────────────
+  @Post('verify-email')
+  async verifyEmail(@Body() body: { token: string }) {
+    return this.authService.verifyEmail(body.token);
+  }
+
+  // ── Password Reset ────────────────────────────────────
+  @Post('request-password-reset')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
+  async requestPasswordReset(@Body() body: { email: string }) {
+    return this.authService.requestPasswordReset(body.email);
+  }
+
+  @Post('reset-password')
+  async resetPassword(@Body() body: { token: string; password: string }) {
+    return this.authService.resetPassword(body.token, body.password);
+  }
 }

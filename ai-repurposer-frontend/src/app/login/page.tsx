@@ -143,6 +143,17 @@ export default function LoginPage() {
             {isRegister ? "Sign in" : "Sign up"}
           </button>
         </p>
+
+        {!isRegister && (
+          <p className="text-center mt-2 text-xs text-zinc-600">
+            <button
+              onClick={() => router.push("/forgot-password")}
+              className="text-zinc-500 hover:text-zinc-400 transition-colors"
+            >
+              Forgot password?
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );

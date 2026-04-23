@@ -8,17 +8,21 @@ datasource db {
 }
 
 model User {
-  id                String   @id @default(uuid())
-  email             String   @unique
-  password          String
-  name              String?
-  googleId          String?  @unique
-  refreshToken      String?
-  plan              Plan     @default(FREE)
-  jobsUsedThisMonth Int      @default(0)
-  usagePeriodStart  DateTime @default(now())
-  createdAt         DateTime @default(now())
-  jobs              Job[]
+  id                      String   @id @default(uuid())
+  email                   String   @unique
+  password                String
+  name                    String?
+  googleId                String?  @unique
+  refreshToken            String?
+  plan                    Plan     @default(FREE)
+  jobsUsedThisMonth       Int      @default(0)
+  usagePeriodStart        DateTime @default(now())
+  createdAt               DateTime @default(now())
+  emailVerified           Boolean  @default(false)
+  emailVerificationToken  String?  @unique
+  passwordResetToken      String?  @unique
+  passwordResetExpires    DateTime?
+  jobs                    Job[]
 }
 
 enum Plan {

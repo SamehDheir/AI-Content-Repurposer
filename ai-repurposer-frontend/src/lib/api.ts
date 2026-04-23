@@ -39,6 +39,24 @@ export const api = {
       body: JSON.stringify({ email, password, name }),
     }),
 
+  verifyEmail: (token: string) =>
+    request<{ message: string }>("/auth/verify-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    }),
+
+  requestPasswordReset: (email: string) =>
+    request<{ message: string }>("/auth/request-password-reset", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+
+  resetPassword: (token: string, password: string) =>
+    request<{ message: string }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
+
   createJob: (videoUrl: string, language: "Arabic" | "English") =>
     request<Job>("/jobs", {
       method: "POST",
