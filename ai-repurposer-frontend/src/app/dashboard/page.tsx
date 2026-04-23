@@ -1,12 +1,14 @@
 "use client";
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useJobs }  from "@/src/hooks/useJobs";
 import { api, type Job } from "@/src/lib/api";
-import { JobCard }      from "@/src/components/JobCard";
-import { ContentViewer } from "@/src/components/content";
-import { UsageBanner }  from "@/src/components/UsageBanner";
 import { Sparkles, LogOut, Plus, AlertCircle, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/src/contexts/ThemeContext";
+
+// Lazy load heavy components
+const JobCard = lazy(() => import("@/src/components/JobCard").then(m => ({ default: m.JobCard })));
+const ContentViewer = lazy(() => import("@/src/components/content").then(m => ({ default: m.ContentViewer })));
+const UsageBanner = lazy(() => import("@/src/components/UsageBanner").then(m => ({ default: m.UsageBanner })));
 
 export default function DashboardPage() {
   const { jobs, loading, error, refetch, updateJob } = useJobs();
@@ -74,7 +76,9 @@ export default function DashboardPage() {
       <main className="relative z-10 max-w-2xl mx-auto px-4 md:px-6 py-6 md:py-8 space-y-5">
 
         {/* Usage */}
-        <UsageBanner />
+        <Suspense fallback={<div className={`h-12 rounded-xl border ${theme === 'dark' ? 'bg-zinc-900 border-white/8' : 'bg-gray-100 border-gray-200'} animate-pulse`} />}>
+          <UsageBanner />
+        </Suspense>
 
         {/* ── Submit form ── */}
         <div className={`rounded-xl border ${theme === 'dark' ? 'border-white/10 bg-zinc-900' : 'border-gray-200 bg-white'} p-4 md:p-5`}>
@@ -176,28 +180,33 @@ export default function DashboardPage() {
           )}
 
           {jobs.map((job) => (
-            <JobCard
-              key={job.id}
-              job={job}
-              onUpdate={(updated) => {
-                updateJob(updated);
-                if (updated.status === "COMPLETED") setSelected(updated);
-              }}
-              onView={setSelected}
-            />
+            <Suspense key={job.id} fallback={<div className={`h-16 rounded-xl border animate-pulse ${theme === 'dark' ? 'bg-zinc-900 border-white/8' : 'bg-gray-100 border-gray-200'}`} />}>
+              <JobCard
+                job={job}
+                onUpdate={(updated) => {
+                  updateJob(updated);
+                  if (updated.status === "COMPLETED") setSelected(updated);
+                }}
+                onView={setSelected}
+              />
+            </Suspense>
           ))}
         </div>
       </main>
 
       {selected && (
-        <ContentViewer 
-          job={selected} 
-          onClose={() => setSelected(null)} 
-          onJobUpdate={(updated) => {
-            setSelected(updated);
-            updateJob(updated);
-          }}
-        />
+        <Suspense fallback={<div className={`fixed inset-0 z-50 flex items-center justify-center ${theme === 'dark' ? 'bg-[#0e0e10]/90' : 'bg-white/90'} backdrop-blur-sm`}>
+          <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+        </div>}>
+          <ContentViewer 
+            job={selected} 
+            onClose={() => setSelected(null)} 
+            onJobUpdate={(updated) => {
+              setSelected(updated);
+              updateJob(updated);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );
