@@ -2,7 +2,10 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 function getToken() {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("accessToken") ?? "";
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; accessToken=`);
+  if (parts.length === 2) return parts.pop()?.split(";").shift() ?? "";
+  return "";
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

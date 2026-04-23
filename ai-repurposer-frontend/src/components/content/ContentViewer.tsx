@@ -121,7 +121,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <ImageIcon size={12} className="text-indigo-400" />
-                <span className="text-xs font-medium text-zinc-400">
+                <span className="text-xs font-medium text-black dark:text-zinc-500">
                   {generatingImage ? "Generating Image..." : "Featured Image"}
                 </span>
               </div>
