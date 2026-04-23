@@ -11,6 +11,7 @@ import {
   Query,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
@@ -29,6 +30,7 @@ export class JobsController {
   ) {}
 
   @Post()
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for job creation
   @UseGuards(AuthGuard('jwt'), UsageLimitGuard) 
   create(
     @Body() body: { videoUrl: string; language?: 'Arabic' | 'English' },
@@ -80,6 +82,7 @@ export class JobsController {
   }
 
   @Post('generate-image')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 image generations per minute
   @UseGuards(AuthGuard('jwt'))
   async generateImage(
     @Body() body: { prompt: string; contentType?: string; content?: string },
@@ -91,6 +94,7 @@ export class JobsController {
   }
 
   @Post(':id/generate-image')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 job image generations per minute
   @UseGuards(AuthGuard('jwt'))
   async generateImageForJob(
     @Param('id') id: string,

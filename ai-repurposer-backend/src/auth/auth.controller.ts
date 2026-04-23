@@ -8,6 +8,7 @@ import {
   Get,
   Res,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import type { Request, Response } from 'express';
@@ -17,11 +18,13 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 registrations per minute
   register(@Body() body: { email: string; password: string; name?: string }) {
     return this.authService.register(body.email, body.password, body.name);
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 login attempts per minute
   @HttpCode(200)
   @UseGuards(AuthGuard('local'))
   login(@Req() req: Request) {
