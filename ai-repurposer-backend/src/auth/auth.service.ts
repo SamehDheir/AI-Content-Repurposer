@@ -3,12 +3,16 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL } from './cookies';
+
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class AuthService {
@@ -26,12 +30,15 @@ export class AuthService {
     const hashed = await bcrypt.hash(password, 12);
     const verificationToken = randomBytes(32).toString('hex');
 
-    const user = await this.prisma.user.create({
-      data: { 
-        email, 
-        password: hashed, 
+    await this.prisma.user.create({
+      data: {
+        email,
+        password: hashed,
         name,
         emailVerificationToken: verificationToken,
+        emailVerificationExpires: new Date(
+          Date.now() + VERIFICATION_TOKEN_TTL_MS,
+        ),
       },
     });
 
@@ -43,7 +50,12 @@ export class AuthService {
       console.error('Failed to send verification email:', error);
     }
 
-    return this.generateTokens(user.id, user.email);
+    // No session is issued here. Verification is enforced at login, so handing
+    // out tokens now would let an unverified address straight into the app.
+    return {
+      message:
+        'Registration successful. Check your email to verify your address.',
+    };
   }
 
   // ── Validate (used by LocalStrategy) ──────────────────
@@ -54,7 +66,46 @@ export class AuthService {
     const match = await bcrypt.compare(password, user.password);
     if (!match) throw new UnauthorizedException('Invalid credentials');
 
+    if (!user.emailVerified) {
+      throw new ForbiddenException(
+        'Please verify your email address before signing in.',
+      );
+    }
+
     return user;
+  }
+
+  // ── Resend verification ───────────────────────────────
+  /**
+   * Without this, an expired token is a dead end: the account cannot log in
+   * and cannot obtain a fresh link.
+   */
+  async resendVerification(email: string) {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    const generic = {
+      message: 'If the account exists and is unverified, a link has been sent',
+    };
+
+    if (!user || user.emailVerified) return generic;
+
+    const verificationToken = randomBytes(32).toString('hex');
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: verificationToken,
+        emailVerificationExpires: new Date(
+          Date.now() + VERIFICATION_TOKEN_TTL_MS,
+        ),
+      },
+    });
+
+    try {
+      await this.emailService.sendVerificationEmail(email, verificationToken);
+    } catch (error) {
+      console.error('Failed to resend verification email:', error);
+    }
+
+    return generic;
   }
 
   // ── Login ──────────────────────────────────────────────
@@ -103,12 +154,12 @@ export class AuthService {
 
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET,
-      expiresIn: '7d',
+      expiresIn: ACCESS_TOKEN_TTL,
     });
 
     const refreshToken = this.jwt.sign(payload, {
       secret: process.env.JWT_REFRESH_SECRET,
-      expiresIn: '7d',
+      expiresIn: REFRESH_TOKEN_TTL,
     });
 
     return { accessToken, refreshToken };
@@ -127,10 +178,18 @@ export class AuthService {
           emailVerified: true, // Google accounts are pre-verified
         },
       });
-    } else if (!user.googleId) {
+    } else if (!user.googleId || !user.emailVerified) {
+      // Completing Google's flow proves control of the address, so linking it
+      // to an account that signed up by password also verifies it. Without
+      // this, that account would keep failing password login with a 403.
       user = await this.prisma.user.update({
         where: { email },
-        data: { googleId },
+        data: {
+          googleId,
+          emailVerified: true,
+          emailVerificationToken: null,
+          emailVerificationExpires: null,
+        },
       });
     }
 
@@ -146,8 +205,11 @@ export class AuthService {
 
   // ── Email Verification ────────────────────────────────
   async verifyEmail(token: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { emailVerificationToken: token },
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+        emailVerificationExpires: { gte: new Date() },
+      },
     });
 
     if (!user) {
@@ -159,6 +221,7 @@ export class AuthService {
       data: {
         emailVerified: true,
         emailVerificationToken: null,
+        emailVerificationExpires: null,
       },
     });
 
@@ -214,6 +277,12 @@ export class AuthService {
         password: hashed,
         passwordResetToken: null,
         passwordResetExpires: null,
+        // Receiving the reset link proves control of the address. Leaving this
+        // false would strand an unverified account: it could reset its
+        // password and still be refused at login.
+        emailVerified: true,
+        emailVerificationToken: null,
+        emailVerificationExpires: null,
       },
     });
 
