@@ -10,6 +10,8 @@ import {
   MessageEvent,
   Query,
   UnauthorizedException,
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
@@ -18,7 +20,8 @@ import type { Request } from 'express';
 import { Observable, interval } from 'rxjs';
 import { switchMap, takeWhile, map } from 'rxjs/operators';
 import { JobsService } from './jobs.service';
-import { UsageLimitGuard } from 'src/guards/usage-limit.guard';
+import { CreateJobDto } from './dto/create-job.dto';
+import { GenerateImageDto } from './dto/generate-image.dto';
 import { ImageService } from 'src/image/image.service';
 
 @Controller('jobs')
@@ -31,11 +34,8 @@ export class JobsController {
 
   @Post()
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for job creation
-  @UseGuards(AuthGuard('jwt'), UsageLimitGuard) 
-  create(
-    @Body() body: { videoUrl: string; language?: 'Arabic' | 'English' },
-    @Req() req: Request,
-  ) {
+  @UseGuards(AuthGuard('jwt'))
+  create(@Body() body: CreateJobDto, @Req() req: Request) {
     const user = req.user as { id: string };
     return this.jobsService.initiateJob(body.videoUrl, user.id, body.language);
   }
@@ -49,9 +49,11 @@ export class JobsController {
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'))
-  getJob(@Param('id') id: string, @Req() req: Request) {
+  async getJob(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as { id: string };
-    return this.jobsService.getJob(id, user.id);
+    const job = await this.jobsService.getJob(id, user.id);
+    if (!job) throw new NotFoundException('Job not found');
+    return job;
   }
 
   @Sse(':id/status')
@@ -65,7 +67,7 @@ export class JobsController {
     try {
       const payload = this.jwt.verify(token, {
         secret: process.env.JWT_SECRET,
-      }) as { sub: string };
+      });
       userId = payload.sub;
     } catch {
       throw new UnauthorizedException('Invalid token');
@@ -84,37 +86,39 @@ export class JobsController {
   @Post('generate-image')
   @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 image generations per minute
   @UseGuards(AuthGuard('jwt'))
-  async generateImage(
-    @Body() body: { prompt: string; contentType?: string; content?: string },
-  ) {
+  async generateImage(@Body() body: GenerateImageDto) {
     if (body.content && body.contentType) {
-      return this.imageService.generateImageFromContent(body.content, body.contentType);
+      return this.imageService.generateImageFromContent(
+        body.content,
+        body.contentType,
+      );
     }
-    return this.imageService.generateImage(body.prompt);
+    return this.imageService.generateImage(body.prompt!);
   }
 
   @Post(':id/generate-image')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 job image generations per minute
   @UseGuards(AuthGuard('jwt'))
-  async generateImageForJob(
-    @Param('id') id: string,
-    @Req() req: Request,
-  ) {
+  async generateImageForJob(@Param('id') id: string, @Req() req: Request) {
     const user = req.user as { id: string };
     const job = await this.jobsService.getJob(id, user.id);
-    
+
     if (!job) {
-      throw new Error('Job not found');
+      throw new NotFoundException('Job not found');
     }
 
     if (job.status !== 'COMPLETED') {
-      throw new Error('Job must be completed before generating image');
+      throw new BadRequestException(
+        'Job must be completed before generating an image',
+      );
     }
 
     // Get transcript from blog post content
-    const blogContent = job.generatedContent.find(c => c.type === 'BLOG_POST');
+    const blogContent = job.generatedContent.find(
+      (c) => c.type === 'BLOG_POST',
+    );
     if (!blogContent) {
-      throw new Error('No blog content found');
+      throw new NotFoundException('No blog content found for this job');
     }
 
     const imageUrl = await this.imageService.generateImageFromContent(

@@ -21,6 +21,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client.incr(key);
   }
 
+  async decrement(key: string): Promise<number> {
+    return this.client.decr(key);
+  }
+
+  /** Runs a Lua script server-side so multi-step updates stay atomic. */
+  async eval(
+    script: string,
+    keys: string[],
+    args: (string | number)[],
+  ): Promise<unknown> {
+    return this.client.eval(script, keys.length, ...keys, ...args);
+  }
+
   async expireAt(key: string, date: Date): Promise<void> {
     const ttl = Math.floor((date.getTime() - Date.now()) / 1000);
     if (ttl > 0) await this.client.expire(key, ttl);

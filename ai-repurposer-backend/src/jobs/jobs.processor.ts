@@ -62,8 +62,7 @@ export class JobsProcessor extends WorkerHost {
 
       // Step 1: Get transcript with retry logic
       let transcript: string;
-      let transcriptSuccess = false;
-      
+
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           if (attempt === 1) {
@@ -72,7 +71,6 @@ export class JobsProcessor extends WorkerHost {
             transcript = await this.transcriptionService.retryTranscription(videoUrl, videoId, attempt);
           }
           this.logger.log(`Transcript length: ${transcript.length} chars`);
-          transcriptSuccess = true;
           break;
         } catch (error: any) {
           this.logger.error(`Transcription attempt ${attempt} failed: ${error.message}`);
