@@ -8,16 +8,16 @@ Known defects and the planned remediation order live in [ROADMAP.md](ROADMAP.md)
 
 Two independent npm projects in one git repo — there is no workspace/monorepo tooling, so `npm install` and all scripts are run from inside each app directory:
 
-- `ai-repurposer-backend/` — NestJS 11 API (port **3000**, hardcoded in [main.ts](ai-repurposer-backend/src/main.ts))
-- `ai-repurposer-frontend/` — Next.js 16 App Router + React 19 + Tailwind 4 (must run on port **3001**)
+- `ai-repurposer-backend/` — NestJS 11 API on port **3001** (`process.env.PORT ?? 3001`)
+- `ai-repurposer-frontend/` — Next.js 16 App Router + React 19 + Tailwind 4 on port **3000** (Next's default)
 
 ## Commands
 
 ### Backend (`ai-repurposer-backend/`)
 
 ```bash
-docker compose up -d          # Postgres 15 (:5432) + Redis 7 (:6379) — required before starting
-npm run start:dev             # watch mode
+docker compose up -d          # see the database note below — Postgres may already be native
+npm run start:dev             # watch mode, :3001
 npm run build && node dist/src/main   # start:prod is broken — see note below
 npm run lint                  # eslint --fix
 npm run format                # prettier
@@ -31,6 +31,14 @@ npx prisma studio
 
 `npm run start:prod` runs `node dist/main`, which does not exist: `prisma.config.ts` sits at the project root, so tsc's inferred `rootDir` covers the whole project and the entrypoint compiles to `dist/src/main.js`. Use `node dist/src/main` until this is fixed ([ROADMAP.md](ROADMAP.md) Phase 3).
 
+**The database is probably not the one in `docker-compose.yml`.** Compose creates a `postgres:15` container holding a database called `ai_repurposer`, but `DATABASE_URL` points at `ai_content_repurposer_db` — which lives on a **native Windows PostgreSQL 18** instance also bound to `localhost:5432`. The native service wins the loopback binding, so the app talks to it and the container sits unused. Verify what you are connected to before trusting `docker exec … psql`:
+
+```bash
+node -e "require('dotenv/config');const{Client}=require('pg');(async()=>{const c=new Client({connectionString:process.env.DATABASE_URL});await c.connect();console.log((await c.query('select current_database(),version()')).rows[0]);await c.end()})()"
+```
+
+**Migration history does not match the schema.** `20260420140011_init` never created the `User` table, the `Plan` enum, `Job.userId` or `Job.imageUrl` — those were applied with `db push`. A fresh `prisma migrate deploy` therefore produces a schema the app cannot run against, and `prisma migrate dev` demands a database reset because it detects the drift. Until this is reconciled ([ROADMAP.md](ROADMAP.md) Phase 3), **write migration SQL by hand and apply it with `prisma migrate deploy`** — never run `migrate dev` against a database with data in it.
+
 Prisma 7: `schema.prisma` has **no `url` in the datasource block** — the connection string comes from [prisma.config.ts](ai-repurposer-backend/prisma.config.ts), which loads `DATABASE_URL` via dotenv. At runtime `PrismaService` uses the `@prisma/adapter-pg` driver adapter rather than the Rust engine's own connection handling.
 
 Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-dlp --js-runtimes nodejs`). Without it, only videos that already have YouTube captions will process.
@@ -38,16 +46,24 @@ Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-
 ### Frontend (`ai-repurposer-frontend/`)
 
 ```bash
-npm run dev -- -p 3001        # MUST be 3001 — see port note below
+npm run dev                   # :3000
 npm run build && npm start
 npm run lint
 ```
 
 No test setup exists on the frontend.
 
-### Port collision (important)
+### Ports
 
-`next dev` defaults to 3000, which the backend already occupies. The backend's CORS allowlist and `FRONTEND_URL` default both assume the frontend is at `http://localhost:3001`, and `.env.local` points `NEXT_PUBLIC_API_URL` at `http://localhost:3000`. Always start the frontend with `-p 3001`.
+Frontend **3000**, backend **3001**. Four settings have to agree, and getting one wrong produces a CORS failure or a silently unauthenticated app:
+
+| Setting | Value |
+|---|---|
+| backend listen | `PORT` (default 3001) |
+| backend `CORS_ORIGINS` | `http://localhost:3000` |
+| backend `FRONTEND_URL` | `http://localhost:3000` (verification and reset links) |
+| backend `GOOGLE_CALLBACK_URL` | `http://localhost:3001/auth/google/callback` |
+| frontend `NEXT_PUBLIC_API_URL` | `http://localhost:3001` |
 
 ## Architecture
 
@@ -57,7 +73,7 @@ The core flow is asynchronous and spans both processes:
 
 1. `POST /jobs` ([jobs.controller.ts](ai-repurposer-backend/src/jobs/jobs.controller.ts)) → `JobsService.initiateJob` atomically claims a monthly quota slot, creates a `Job` row (`QUEUED`), and enqueues `process-video` on the BullMQ `repurpose-queue` (3 attempts, exponential backoff). If anything after the claim fails, the slot is released and the orphaned row deleted.
 2. `JobsProcessor` ([jobs.processor.ts](ai-repurposer-backend/src/jobs/jobs.processor.ts)) — the single worker — runs: transcript (up to 3 attempts) → all four `ContentType`s generated **in parallel** via `Promise.all` → one Prisma `$transaction` that deletes prior content, inserts the new rows, and flips the job to `COMPLETED`. It is idempotent: it skips jobs already `COMPLETED` or missing from the DB.
-3. The frontend watches progress over **SSE**: `GET /jobs/:id/status?token=…` polls the DB every 2s via `rxjs interval` and completes on `COMPLETED`/`FAILED`.
+3. The frontend watches progress over **SSE**: `GET /jobs/:id/status` (authenticated by the same cookie guard as every other route) polls the DB every 2s via `rxjs interval` and completes on `COMPLETED`/`FAILED`.
 
 Because the worker runs in the same Nest process as the API, there is no separate worker entrypoint — starting the backend starts both.
 
@@ -69,9 +85,18 @@ Because the worker runs in the same Nest process as the API, there is no separat
 
 ### Auth
 
-JWT via Passport with four strategies (`local`, `jwt`, `jwt-refresh`, `google`). Access and refresh tokens both expire in 7d and use **different secrets** (`JWT_SECRET` / `JWT_REFRESH_SECRET`); the refresh token is stored bcrypt-hashed on `User.refreshToken`. Google OAuth redirects to `${FRONTEND_URL}/auth/callback?accessToken=…&refreshToken=…`.
+JWT via Passport with four strategies (`local`, `jwt`, `jwt-refresh`, `google`). Access tokens live **15 minutes**, refresh tokens **7 days**, under different secrets (`JWT_SECRET` / `JWT_REFRESH_SECRET`); the refresh token is stored bcrypt-hashed on `User.refreshToken`.
 
-On the frontend, tokens live in **non-HttpOnly cookies** set by `document.cookie` (login page, OAuth callback page) — a known weakness scheduled for replacement in [ROADMAP.md](ROADMAP.md) Phase 2. All readers go through `getCookie` in [cookies.ts](ai-repurposer-frontend/src/lib/cookies.ts): [api.ts](ai-repurposer-frontend/src/lib/api.ts) for the `Authorization` header and [useJobSSE.ts](ai-repurposer-frontend/src/hooks/useJobSSE.ts) for the SSE query param. [proxy.ts](ai-repurposer-frontend/src/proxy.ts) — Next 16's rename of `middleware.ts` — gates `/dashboard` and `/login` on the cookie's presence server-side.
+**Tokens are HttpOnly cookies and are never visible to JavaScript.** They are set server-side by [cookies.ts](ai-repurposer-backend/src/auth/cookies.ts) on login, refresh and the Google callback, and cleared on logout. Consequences worth internalising before touching this code:
+
+- **No response body ever contains a token**, and no client code may set one. `document.cookie` must not reappear anywhere in the frontend.
+- **The bearer header is not accepted.** `JwtStrategy` reads the `accessToken` cookie only, so `curl` needs a cookie jar (`-c`/`-b`), not `Authorization`.
+- Every frontend request sends `credentials: 'include'` ([api.ts](ai-repurposer-frontend/src/lib/api.ts)). Because credentialed CORS forbids a wildcard origin, `CORS_ORIGINS` must list the frontend origin exactly.
+- `api.ts` retries once through `POST /auth/refresh` on a 401, sharing a single in-flight refresh so a burst of parallel 401s rotates the token once. `/auth/login`, `/auth/register` and `/auth/refresh` are excluded to avoid a loop.
+- [proxy.ts](ai-repurposer-frontend/src/proxy.ts) gates `/dashboard` and `/login` on the **refresh** cookie, not the access cookie — the latter expires every 15 minutes and would bounce active users to the login page.
+- Cookie attributes come from env: `COOKIE_SAMESITE` (default `lax`), `COOKIE_SECURE` (default: on in production), `COOKIE_DOMAIN`. A cross-domain deployment needs `COOKIE_SAMESITE=none`, which forces `Secure`, requires HTTPS, and gives up the CSRF protection `Lax` provides for free — that setup would need CSRF tokens.
+
+**Email verification is enforced at login.** `validateUser` rejects unverified accounts with 403, so `register` deliberately returns a message rather than a session. Verification tokens expire after 24h, and `POST /auth/resend-verification` exists so an expired token is not a dead end. Google accounts are pre-verified. Accounts predating enforcement were backfilled to verified by `20260723120000_email_verification_expiry_and_grandfather`.
 
 ### Usage limiting
 
