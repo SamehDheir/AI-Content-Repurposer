@@ -1,19 +1,13 @@
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+import { ACCESS_TOKEN, getCookie } from "./cookies";
 
-function getToken() {
-  if (typeof window === "undefined") return "";
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; accessToken=`);
-  if (parts.length === 2) return parts.pop()?.split(";").shift() ?? "";
-  return "";
-}
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
+      Authorization: `Bearer ${getCookie(ACCESS_TOKEN)}`,
       ...options?.headers,
     },
   });

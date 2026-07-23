@@ -31,7 +31,3 @@ export function parseHighlights(text: string): { title: string; body: string }[]
     });
 }
 
-export function renderBlogHTML(text: string): React.ReactNode[] {
-  // handled inline in component
-  return [];
-}
