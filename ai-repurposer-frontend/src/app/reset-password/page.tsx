@@ -1,10 +1,20 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/src/lib/api";
 import { Sparkles, AlertCircle, CheckCircle, Lock } from "lucide-react";
 
+// useSearchParams() opts the subtree out of prerendering, so it needs its own
+// Suspense boundary or `next build` fails on this route.
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [password, setPassword] = useState("");

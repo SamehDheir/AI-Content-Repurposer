@@ -1,10 +1,20 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/src/lib/api";
 import { Sparkles, CheckCircle, AlertCircle } from "lucide-react";
 
+// useSearchParams() opts the subtree out of prerendering, so it needs its own
+// Suspense boundary or `next build` fails on this route.
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyEmailHandler />
+    </Suspense>
+  );
+}
+
+function VerifyEmailHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");

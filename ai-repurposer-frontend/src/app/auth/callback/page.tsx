@@ -1,8 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function AuthCallback() {
+function AuthCallbackHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -23,6 +23,10 @@ export default function AuthCallback() {
     }
   }, [searchParams, router]);
 
+  return <Signing />;
+}
+
+function Signing() {
   return (
     <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center">
       <div className="text-center">
@@ -30,5 +34,15 @@ export default function AuthCallback() {
         <p className="text-sm text-zinc-500">Signing you in...</p>
       </div>
     </div>
+  );
+}
+
+// useSearchParams() opts the subtree out of prerendering, so it needs its own
+// Suspense boundary or `next build` fails on this route.
+export default function AuthCallback() {
+  return (
+    <Suspense fallback={<Signing />}>
+      <AuthCallbackHandler />
+    </Suspense>
   );
 }
