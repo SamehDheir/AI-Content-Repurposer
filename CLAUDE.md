@@ -16,9 +16,10 @@ Two independent npm projects in one git repo — there is no workspace/monorepo 
 ### Backend (`ai-repurposer-backend/`)
 
 ```bash
-docker compose up -d          # see the database note below — Postgres may already be native
+docker compose up -d          # Postgres on :5434, Redis on :6380 (not the defaults — see below)
+docker compose --profile apps up -d --build   # also build and run both apps
 npm run start:dev             # watch mode, :3001
-npm run build && node dist/src/main   # start:prod is broken — see note below
+npm run build && npm run start:prod
 npm run lint                  # eslint --fix
 npm run format                # prettier
 npm test                      # jest, *.spec.ts under src/
@@ -29,19 +30,17 @@ npx prisma generate           # required after any schema.prisma edit
 npx prisma studio
 ```
 
-`npm run start:prod` runs `node dist/main`, which does not exist: `prisma.config.ts` sits at the project root, so tsc's inferred `rootDir` covers the whole project and the entrypoint compiles to `dist/src/main.js`. Use `node dist/src/main` until this is fixed ([ROADMAP.md](ROADMAP.md) Phase 3).
-
-**The database is probably not the one in `docker-compose.yml`.** Compose creates a `postgres:15` container holding a database called `ai_repurposer`, but `DATABASE_URL` points at `ai_content_repurposer_db` — which lives on a **native Windows PostgreSQL 18** instance also bound to `localhost:5432`. The native service wins the loopback binding, so the app talks to it and the container sits unused. Verify what you are connected to before trusting `docker exec … psql`:
+**Compose deliberately avoids the default database ports.** Postgres is published on **5434** and Redis on **6380**, because a native Windows PostgreSQL 18 install also binds `localhost:5432` and silently wins the loopback — the app would talk to the native server while the container sat unused. If `DATABASE_URL` ever points at 5432 again, confirm which server answers before trusting `docker exec … psql`:
 
 ```bash
 node -e "require('dotenv/config');const{Client}=require('pg');(async()=>{const c=new Client({connectionString:process.env.DATABASE_URL});await c.connect();console.log((await c.query('select current_database(),version()')).rows[0]);await c.end()})()"
 ```
 
-**Migration history does not match the schema.** `20260420140011_init` never created the `User` table, the `Plan` enum, `Job.userId` or `Job.imageUrl` — those were applied with `db push`. A fresh `prisma migrate deploy` therefore produces a schema the app cannot run against, and `prisma migrate dev` demands a database reset because it detects the drift. Until this is reconciled ([ROADMAP.md](ROADMAP.md) Phase 3), **write migration SQL by hand and apply it with `prisma migrate deploy`** — never run `migrate dev` against a database with data in it.
+Migration history is a single squashed baseline (`20260723140000_init`) that reproduces the whole schema on an empty database. The previous history was never committed — `prisma/migrations` was gitignored — so the schema had drifted via `db push` and no migration described the `User` table, the `Plan` enum, `Job.userId` or `Job.imageUrl`. `migrate deploy` from scratch and `migrate dev` both work now; keep it that way by committing every migration.
 
 Prisma 7: `schema.prisma` has **no `url` in the datasource block** — the connection string comes from [prisma.config.ts](ai-repurposer-backend/prisma.config.ts), which loads `DATABASE_URL` via dotenv. At runtime `PrismaService` uses the `@prisma/adapter-pg` driver adapter rather than the Rust engine's own connection handling.
 
-Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-dlp --js-runtimes nodejs`). Without it, only videos that already have YouTube captions will process.
+Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-dlp --js-runtimes nodejs`). Without it, only videos that already have YouTube captions will process — `TranscriptionService.onModuleInit` logs a warning at boot if it is missing. The backend Docker image installs it along with Python.
 
 ### Frontend (`ai-repurposer-frontend/`)
 
@@ -110,7 +109,7 @@ Two independent mechanisms, easy to confuse:
 ## Conventions and gotchas
 
 - Backend imports mix relative paths (`../prisma/prisma.service`) with root-absolute ones (`src/ai/ai.service`, resolved by `baseUrl: "./"`). There is no `@/` alias on the backend.
-- The module file is `src/prisma/Prisma.module.ts` (capital P) but the service is `prisma.service.ts`. Imports use both casings — this works on Windows but will break a case-sensitive filesystem.
+- Backend filenames are all lowercase. `Prisma.module.ts` was renamed to `prisma.module.ts` because the mixed-casing imports only worked on Windows and broke on a case-sensitive filesystem — keep new files lowercase.
 - Frontend alias `@/*` maps to the **project root**, not `src/`, so imports read `@/src/lib/api`.
 - `main.ts` registers a global `ValidationPipe({ whitelist: true, transform: true })`, so every `@Body()` needs a DTO class to be validated — an inline object type silently skips validation entirely. DTOs live in `src/jobs/dto/` and `src/auth/dto/`. Note that `whitelist` strips undecorated properties, so a field without a decorator never reaches the handler.
 - Dark/light theming is threaded manually through `useTheme()` with ternaries on nearly every `className` rather than Tailwind's `dark:` variant — match that pattern when editing components.
