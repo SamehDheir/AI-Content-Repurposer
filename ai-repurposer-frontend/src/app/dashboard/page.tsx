@@ -59,10 +59,10 @@ export default function DashboardPage() {
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
           <button
-            onClick={() => { 
-              document.cookie = "accessToken=; path=/; max-age=0";
-              document.cookie = "refreshToken=; path=/; max-age=0";
-              location.href = "/login"; 
+            onClick={async () => {
+              // Cookies are HttpOnly, so only the server can clear them.
+              await api.logout().catch(() => {});
+              location.href = "/login";
             }}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all ${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300 hover:bg-white/8' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
             aria-label="Sign out"

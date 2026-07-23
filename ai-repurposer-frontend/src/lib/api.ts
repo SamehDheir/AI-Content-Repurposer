@@ -1,42 +1,94 @@
-import { ACCESS_TOKEN, getCookie } from "./cookies";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
+/** Endpoints that must not trigger a refresh-and-retry on 401. */
+const NO_RETRY = ["/auth/login", "/auth/register", "/auth/refresh"];
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+async function toError(res: Response): Promise<ApiError> {
+  const body = await res.json().catch(() => ({}));
+  // Nest returns a string for single errors and an array from the ValidationPipe.
+  const message = Array.isArray(body?.message)
+    ? body.message.join(", ")
+    : (body?.message ?? "Request failed");
+  return new ApiError(message, res.status);
+}
+
+function send(path: string, options?: RequestInit) {
+  return fetch(`${BASE}${path}`, {
     ...options,
+    // Auth travels as HttpOnly cookies, which are only attached when the
+    // request explicitly opts in to sending credentials cross-origin.
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${getCookie(ACCESS_TOKEN)}`,
       ...options?.headers,
     },
   });
+}
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message ?? "Request failed");
+// A single in-flight refresh shared by every 401 that arrives at once, so a
+// burst of parallel requests rotates the token once rather than racing.
+let refreshing: Promise<boolean> | null = null;
+
+function refreshSession(): Promise<boolean> {
+  refreshing ??= send("/auth/refresh", { method: "POST" })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .finally(() => {
+      refreshing = null;
+    });
+  return refreshing;
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  let res = await send(path, options);
+
+  // The access token lives ~15 minutes; on expiry, refresh once and replay.
+  if (res.status === 401 && !NO_RETRY.includes(path)) {
+    if (await refreshSession()) {
+      res = await send(path, options);
+    }
   }
 
-  return res.json();
+  if (!res.ok) throw await toError(res);
+
+  return res.status === 204 ? (undefined as T) : ((await res.json()) as T);
 }
 
 export const api = {
   login: (email: string, password: string) =>
-    request<{ accessToken: string; refreshToken: string }>("/auth/login", {
+    request<AuthUser>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
   register: (email: string, password: string, name?: string) =>
-    request<{ accessToken: string; refreshToken: string }>("/auth/register", {
+    request<{ message: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
+
+  logout: () => request<{ message: string }>("/auth/logout", { method: "POST" }),
 
   verifyEmail: (token: string) =>
     request<{ message: string }>("/auth/verify-email", {
       method: "POST",
       body: JSON.stringify({ token }),
+    }),
+
+  resendVerification: (email: string) =>
+    request<{ message: string }>("/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
     }),
 
   requestPasswordReset: (email: string) =>
@@ -65,7 +117,7 @@ export const api = {
       method: "POST",
     }),
 
-  getMe: () => request<any>("/users/me"),
+  getMe: () => request<Me>("/users/me"),
 };
 
 // ── Types ──────────────────────────────────────────────────
@@ -75,6 +127,25 @@ export type ContentType =
   | "BLOG_POST"
   | "FACEBOOK_POST"
   | "HIGHLIGHTS";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+}
+
+export interface Me {
+  id: string;
+  email: string;
+  name: string | null;
+  plan: "FREE" | "PRO";
+  createdAt: string;
+  usage: {
+    used: number;
+    limit: number | null;
+    remaining: number | null;
+    resetsAt: string;
+  };
+}
 
 export interface GeneratedContent {
   type: ContentType;

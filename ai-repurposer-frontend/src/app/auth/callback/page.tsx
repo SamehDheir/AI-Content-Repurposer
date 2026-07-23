@@ -1,32 +1,16 @@
 "use client";
-import { Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-function AuthCallbackHandler() {
+// The backend sets HttpOnly cookies before redirecting here, so there are no
+// tokens in the URL to read — this page just forwards to the dashboard.
+export default function AuthCallback() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const accessToken = searchParams.get("accessToken");
-    const refreshToken = searchParams.get("refreshToken");
+    router.replace("/dashboard");
+  }, [router]);
 
-    if (accessToken && refreshToken) {
-      // Set cookies
-      document.cookie = `accessToken=${accessToken}; path=/; max-age=604800`;
-      document.cookie = `refreshToken=${refreshToken}; path=/; max-age=604800`;
-      
-      // Redirect to dashboard
-      router.push("/dashboard");
-    } else {
-      // Redirect to login if no tokens
-      router.push("/login");
-    }
-  }, [searchParams, router]);
-
-  return <Signing />;
-}
-
-function Signing() {
   return (
     <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center">
       <div className="text-center">
@@ -34,15 +18,5 @@ function Signing() {
         <p className="text-sm text-zinc-500">Signing you in...</p>
       </div>
     </div>
-  );
-}
-
-// useSearchParams() opts the subtree out of prerendering, so it needs its own
-// Suspense boundary or `next build` fails on this route.
-export default function AuthCallback() {
-  return (
-    <Suspense fallback={<Signing />}>
-      <AuthCallbackHandler />
-    </Suspense>
   );
 }

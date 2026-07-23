@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Play, Zap, Image as ImageIcon, Check, ArrowRight, Menu, X, Moon, Sun } from "lucide-react";
 import { useTheme } from "@/src/contexts/ThemeContext";
+import { api } from "@/src/lib/api";
 
 export default function Home() {
   const router = useRouter();
@@ -13,8 +14,16 @@ export default function Home() {
   const isDark = theme === 'dark';
 
   useEffect(() => {
-    const token = document.cookie.includes('accessToken');
-    setIsAuthenticated(token);
+    // The auth cookies are HttpOnly and unreadable from JavaScript, so probe
+    // the API instead of inspecting document.cookie.
+    let cancelled = false;
+    api
+      .getMe()
+      .then(() => !cancelled && setIsAuthenticated(true))
+      .catch(() => !cancelled && setIsAuthenticated(false));
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleAuthClick = () => {
