@@ -1,4 +1,9 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { Innertube } from 'youtubei.js';
 import Groq from 'groq-sdk';
 import * as fs from 'fs';
@@ -10,12 +15,30 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 @Injectable()
-export class TranscriptionService {
+export class TranscriptionService implements OnModuleInit {
   private readonly logger = new Logger(TranscriptionService.name);
   private readonly groq = new Groq({
     apiKey: process.env.GROQ_API_KEY,
     timeout: 20 * 60 * 1000,
   });
+
+  /**
+   * yt-dlp is an undeclared system dependency. Without it, only videos that
+   * already have YouTube captions can process, and the failure otherwise
+   * surfaces three retries deep inside a job rather than at startup.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      const { stdout } = await execAsync('yt-dlp --version');
+      this.logger.log(`yt-dlp ${stdout.trim()} detected`);
+    } catch {
+      this.logger.warn(
+        'yt-dlp not found on PATH — Whisper fallback is unavailable, so only ' +
+          'videos with existing YouTube captions will process. Install it from ' +
+          'https://github.com/yt-dlp/yt-dlp and ensure it is on PATH.',
+      );
+    }
+  }
 
   async getTranscript(videoUrl: string): Promise<string> {
     const videoId = this.extractVideoId(videoUrl);
