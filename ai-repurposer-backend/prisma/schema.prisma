@@ -1,0 +1,73 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                      String   @id @default(uuid())
+  email                   String   @unique
+  password                String
+  name                    String?
+  googleId                String?  @unique
+  refreshToken            String?
+  plan                    Plan     @default(FREE)
+  jobsUsedThisMonth       Int      @default(0)
+  usagePeriodStart        DateTime @default(now())
+  createdAt               DateTime @default(now())
+  emailVerified           Boolean  @default(false)
+  emailVerificationToken  String?  @unique
+  passwordResetToken      String?  @unique
+  passwordResetExpires    DateTime?
+  jobs                    Job[]
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ContentType {
+  TWITTER_THREAD
+  BLOG_POST
+  FACEBOOK_POST
+  HIGHLIGHTS
+}
+
+model Job {
+  id               String             @id @default(uuid())
+  videoUrl         String
+  status           JobStatus          @default(QUEUED)
+  language         String             @default("Arabic")
+  createdAt        DateTime           @default(now())
+  userId           String
+  user             User               @relation(fields: [userId], references: [id])
+  updatedAt        DateTime           @updatedAt
+  imageUrl         String?
+  generatedContent GeneratedContent[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model GeneratedContent {
+  id        String      @id @default(uuid())
+  jobId     String
+  type      ContentType
+  body      String      @db.Text
+  createdAt DateTime    @default(now())
+  job       Job         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, type])
+  @@index([jobId])
+}
