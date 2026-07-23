@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15
@@ -7,9 +5,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: ai_repurposer
+      # Must match the database name in DATABASE_URL.
+      POSTGRES_DB: ai_content_repurposer_db
     ports:
-      - "5432:5432"
+      # Deliberately not 5432: a native PostgreSQL install commonly owns that
+      # port and silently wins the loopback binding, so the app would connect
+      # to the native server while this container sat unused.
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +24,8 @@ services:
     image: redis:7-alpine
     container_name: ai-repurposer-redis
     ports:
-      - "6379:6379"
+      # Also shifted off the default for the same reason.
+      - "6380:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -30,6 +33,48 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # The app services are opt-in so the default `docker compose up -d` still
+  # brings up only the datastores for local development:
+  #   docker compose --profile apps up -d --build
+  backend:
+    build:
+      context: .
+    container_name: ai-repurposer-api
+    profiles: ["apps"]
+    environment:
+      # Inside the compose network, services reach each other by name on the
+      # container's own port — not the shifted host port.
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ai_content_repurposer_db?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PORT: 3001
+      CORS_ORIGINS: http://localhost:3000
+      FRONTEND_URL: http://localhost:3000
+      NODE_ENV: production
+    env_file:
+      # Secrets (JWT, SMTP, API keys) stay in .env and are never baked in.
+      - .env
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../ai-repurposer-frontend
+      args:
+        # Reaches the backend from the browser, so it is a host URL.
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    container_name: ai-repurposer-web
+    profiles: ["apps"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:
