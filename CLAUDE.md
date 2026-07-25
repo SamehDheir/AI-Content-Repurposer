@@ -40,7 +40,15 @@ Migration history is a single squashed baseline (`20260723140000_init`) that rep
 
 Prisma 7: `schema.prisma` has **no `url` in the datasource block** — the connection string comes from [prisma.config.ts](ai-repurposer-backend/prisma.config.ts), which loads `DATABASE_URL` via dotenv. At runtime `PrismaService` uses the `@prisma/adapter-pg` driver adapter rather than the Rust engine's own connection handling.
 
-Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-dlp --js-runtimes nodejs`). Without it, only videos that already have YouTube captions will process — `TranscriptionService.onModuleInit` logs a warning at boot if it is missing. The backend Docker image installs it along with Python.
+Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH`. Without it, only videos that already have YouTube captions will process — `TranscriptionService.onModuleInit` logs a warning at boot if it is missing. The backend Docker image installs it along with Python.
+
+YouTube extraction now needs a JavaScript runtime, so the command passes `--js-runtimes node`. **The runtime is `node`, not `nodejs`** — yt-dlp does not reject an unknown name, it warns, silently drops the runtime, and then fails every video with `ERROR: [youtube] <id>: This video is not available`, which looks like a dead or private video rather than a local misconfiguration. If transcription starts failing wholesale, check for `Ignoring unsupported JavaScript runtime(s)` in the log first, and confirm by hand:
+
+```bash
+yt-dlp --js-runtimes node --simulate --print "%(id)s|%(duration)s" "<url>"
+```
+
+The download requests `bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio` but always writes to a `.webm` filename, and there is no ffmpeg to remux. Where a video offers no webm audio, that leaves m4a bytes in a `.webm` file, which Groq may reject on the filename — a known rough edge, not yet hit in practice.
 
 ### Frontend (`ai-repurposer-frontend/`)
 

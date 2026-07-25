@@ -36,8 +36,10 @@ export function Waveform({
             className="flex-1 origin-center rounded-[1px]"
             style={{
               background: color,
-              height: `${height * 100}%`,
-              transform: live ? undefined : "scaleY(1)",
+              // Rounded: an unbounded float serialises differently on the
+              // server and the client, which React reports as a hydration
+              // mismatch on the style attribute.
+              height: `${(height * 100).toFixed(2)}%`,
               animation: live
                 ? `cr-wave ${(1.1 + ((i * 7) % 9) * 0.12).toFixed(2)}s ease-in-out ${((i % 11) * 0.07).toFixed(2)}s infinite`
                 : undefined,

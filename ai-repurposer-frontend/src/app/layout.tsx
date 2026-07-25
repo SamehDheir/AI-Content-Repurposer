@@ -65,6 +65,9 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${displaySerif.variable} h-full antialiased`}
+      // globals.css sets scroll-behavior: smooth for the in-page section links;
+      // this tells Next to bypass it on route transitions.
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       <head>
