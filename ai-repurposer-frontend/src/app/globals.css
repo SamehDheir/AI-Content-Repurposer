@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Tailwind 4 defaults `dark:` to prefers-color-scheme. ThemeProvider toggles a
+   `.dark` class on <html> so the in-app switch wins over the OS setting, which
+   means the variant has to be redefined against that class. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,11 +17,12 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Follows the toggled class, not the OS. These drive `body` below, so keying
+   them off prefers-color-scheme left the page background stuck on the OS
+   preference while every Tailwind class followed the in-app toggle. */
+:root:where(.dark) {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {
