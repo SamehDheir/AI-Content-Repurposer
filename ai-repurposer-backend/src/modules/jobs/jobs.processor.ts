@@ -1,11 +1,11 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@/infra/prisma/prisma.service';
 import { ContentType } from '@prisma/client';
-import { TranscriptionService } from 'src/transcription/transcription.service';
-import { AIService } from 'src/ai/ai.service';
-import { ImageService } from 'src/image/image.service';
+import { TranscriptionService } from '@/modules/transcription/transcription.service';
+import { AIService } from '@/modules/ai/ai.service';
+import { ImageService } from '@/modules/image/image.service';
 
 const CONTENT_TYPES: ContentType[] = [
   'TWITTER_THREAD',

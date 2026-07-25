@@ -2,9 +2,9 @@
 import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
-import { PrismaService } from '../prisma/prisma.service';
-import { UsageService } from '../usage/usage.service';
-import { PLAN_LIMITS, nextMonthStart } from '../config/plans.config';
+import { PrismaService } from '@/infra/prisma/prisma.service';
+import { UsageService } from '@/modules/usage/usage.service';
+import { PLAN_LIMITS, nextMonthStart } from '@/common/config/plans.config';
 
 @Controller('users')
 export class UsersController {

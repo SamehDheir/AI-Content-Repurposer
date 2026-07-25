@@ -6,8 +6,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
-import { EmailService } from '../email/email.service';
+import { PrismaService } from '@/infra/prisma/prisma.service';
+import { EmailService } from '@/modules/email/email.service';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { ACCESS_TOKEN_TTL, REFRESH_TOKEN_TTL } from './cookies';

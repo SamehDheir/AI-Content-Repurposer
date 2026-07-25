@@ -14,6 +14,12 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
+    // `nest build` rewrites these to relative requires in the emitted JS, so the
+    // alias needs no runtime resolver. Jest does need `moduleNameMapper`, which
+    // both jest configs set.
+    "paths": {
+      "@/*": ["src/*"]
+    },
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": true,

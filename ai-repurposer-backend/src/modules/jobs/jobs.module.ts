@@ -3,11 +3,11 @@ import { BullModule } from '@nestjs/bullmq';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 import { JobsProcessor } from './jobs.processor';
-import { TranscriptionService } from 'src/transcription/transcription.service';
-import { AIService } from 'src/ai/ai.service';
-import { UsageModule } from '../usage/usage.module';
+import { UsageModule } from '@/modules/usage/usage.module';
 import { JwtModule } from '@nestjs/jwt';
-import { ImageModule } from '../image/image.module';
+import { ImageModule } from '@/modules/image/image.module';
+import { AIModule } from '@/modules/ai/ai.module';
+import { TranscriptionModule } from '@/modules/transcription/transcription.module';
 
 @Module({
   imports: [
@@ -15,10 +15,12 @@ import { ImageModule } from '../image/image.module';
     JwtModule,
     UsageModule,
     ImageModule,
+    AIModule,
+    TranscriptionModule,
   ],
   controllers: [JobsController],
   // PrismaService comes from the @Global PrismaModule — re-providing it here
   // would create a second client with its own connection pool.
-  providers: [JobsService, JobsProcessor, TranscriptionService, AIService],
+  providers: [JobsService, JobsProcessor],
 })
 export class JobsModule {}

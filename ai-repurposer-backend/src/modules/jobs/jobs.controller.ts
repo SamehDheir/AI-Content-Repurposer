@@ -19,7 +19,7 @@ import { switchMap, takeWhile, map } from 'rxjs/operators';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
-import { ImageService } from 'src/image/image.service';
+import { ImageService } from '@/modules/image/image.service';
 
 @Controller('jobs')
 export class JobsController {

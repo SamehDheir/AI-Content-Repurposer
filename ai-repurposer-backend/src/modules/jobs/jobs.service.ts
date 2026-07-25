@@ -1,9 +1,9 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
-import { UsageService } from '../usage/usage.service';
-import { PLAN_LIMITS } from '../config/plans.config';
+import { PrismaService } from '@/infra/prisma/prisma.service';
+import { UsageService } from '@/modules/usage/usage.service';
+import { PLAN_LIMITS } from '@/common/config/plans.config';
 
 @Injectable()
 export class JobsService {

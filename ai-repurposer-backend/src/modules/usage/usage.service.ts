@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { RedisService } from '../redis/redis.service';
-import { usageKey, nextMonthStart } from '../config/plans.config';
+import { RedisService } from '@/infra/redis/redis.service';
+import { usageKey, nextMonthStart } from '@/common/config/plans.config';
 
 /**
  * Reserves one unit of monthly quota and refuses if that would exceed the
