@@ -12,6 +12,8 @@ import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
+import { extractVideoId } from '@/common/utils/youtube.util';
+
 const execAsync = promisify(exec);
 
 @Injectable()
@@ -41,7 +43,7 @@ export class TranscriptionService implements OnModuleInit {
   }
 
   async getTranscript(videoUrl: string): Promise<string> {
-    const videoId = this.extractVideoId(videoUrl);
+    const videoId = extractVideoId(videoUrl);
     if (!videoId) throw new BadRequestException('Invalid YouTube URL or video ID');
 
     this.logger.log(`Fetching transcript for video: ${videoId}`);
@@ -153,13 +155,4 @@ export class TranscriptionService implements OnModuleInit {
     }
   }
 
-  private extractVideoId(url: string): string | null {
-    if (!url) return null;
-    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
-
-    const regExp =
-      /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
-    const match = url.match(regExp);
-    return match ? match[1] : null;
-  }
 }

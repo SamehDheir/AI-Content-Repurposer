@@ -6,6 +6,7 @@ import { ContentType } from '@prisma/client';
 import { TranscriptionService } from '@/modules/transcription/transcription.service';
 import { AIService } from '@/modules/ai/ai.service';
 import { ImageService } from '@/modules/image/image.service';
+import { extractVideoId } from '@/common/utils/youtube.util';
 
 const CONTENT_TYPES: ContentType[] = [
   'TWITTER_THREAD',
@@ -35,7 +36,7 @@ export class JobsProcessor extends WorkerHost {
     }>,
   ): Promise<void> {
     const { jobId, videoUrl, language = 'Arabic' } = job.data;
-    const videoId = this.extractVideoId(videoUrl);
+    const videoId = extractVideoId(videoUrl);
     
     if (!videoId) {
       throw new Error('Invalid YouTube URL - could not extract video ID');
@@ -127,13 +128,4 @@ export class JobsProcessor extends WorkerHost {
     });
   }
 
-  private extractVideoId(url: string): string | null {
-    if (!url) return null;
-    if (/^[a-zA-Z0-9_-]{11}$/.test(url.trim())) return url.trim();
-
-    const regExp =
-      /(?:youtube\.com\/(?:[^/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?/\s]{11})/i;
-    const match = url.match(regExp);
-    return match ? match[1] : null;
-  }
 }
