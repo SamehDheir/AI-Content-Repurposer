@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/src/lib/api";
+import { api } from "@/lib/api";
 import { Sparkles, AlertCircle, CheckCircle, Mail } from "lucide-react";
 
 export default function ForgotPasswordPage() {

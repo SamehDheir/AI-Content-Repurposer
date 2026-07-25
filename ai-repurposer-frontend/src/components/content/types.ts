@@ -1,4 +1,4 @@
-import { type Job, type ContentType } from "@/src/lib/api";
+import { type Job, type ContentType } from "@/lib/api";
 
 export interface ContentViewerProps {
   job: Job;

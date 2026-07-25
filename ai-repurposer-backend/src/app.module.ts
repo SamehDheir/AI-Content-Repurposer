@@ -1,13 +1,13 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { PrismaModule } from './prisma/prisma.module';
-import { JobsModule } from './jobs/jobs.module';
+import { PrismaModule } from '@/infra/prisma/prisma.module';
+import { JobsModule } from '@/modules/jobs/jobs.module';
 import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from './auth/auth.module';
-import { UsersController } from './users/users.controller';
-import { RedisModule } from './redis/redis.module';
-import { UsageModule } from './usage/usage.module';
-import { ImageModule } from './image/image.module';
+import { AuthModule } from '@/modules/auth/auth.module';
+import { UsersModule } from '@/modules/users/users.module';
+import { RedisModule } from '@/infra/redis/redis.module';
+import { UsageModule } from '@/modules/usage/usage.module';
+import { ImageModule } from '@/modules/image/image.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
@@ -36,9 +36,10 @@ import { ThrottlerModule } from '@nestjs/throttler';
     AuthModule,
     RedisModule,
     UsageModule,
-    ImageModule
+    ImageModule,
+    UsersModule,
   ],
-  controllers: [UsersController],
+  controllers: [],
   providers: [],
 })
 export class AppModule {}

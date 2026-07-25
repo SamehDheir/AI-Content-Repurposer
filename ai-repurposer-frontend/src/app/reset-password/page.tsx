@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/src/lib/api";
+import { api } from "@/lib/api";
 import { Sparkles, AlertCircle, CheckCircle, Lock } from "lucide-react";
 
 // useSearchParams() opts the subtree out of prerendering, so it needs its own

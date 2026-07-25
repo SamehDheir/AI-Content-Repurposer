@@ -1,14 +1,11 @@
 "use client";
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { useTheme } from "@/src/contexts/ThemeContext";
 import { extractHashtags, extractHook } from "./parsers";
 
 interface Props { body: string }
 
 export function FacebookContent({ body }: Props) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
   const hashtags = extractHashtags(body);
   const hook = extractHook(body);
   const mainBody = body.replace(hook, "").replace(/#\w+/g, "").trim();
@@ -31,25 +28,25 @@ export function FacebookContent({ body }: Props) {
     <div className="space-y-4">
       {/* Hook */}
       {hook && (
-        <div className={`relative p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border ${isDark ? 'border-indigo-500/20' : 'border-indigo-300'}`}>
+        <div className={"relative p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border border-indigo-300 dark:border-indigo-500/20"}>
           <div className="flex items-center gap-2 mb-2">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
             <span className="text-xs font-semibold text-indigo-500 uppercase tracking-widest">Hook</span>
           </div>
-          <p className={`text-sm font-medium leading-relaxed ${isDark ? 'text-zinc-100' : 'text-gray-900'}`}>{hook}</p>
+          <p className={"text-sm font-medium leading-relaxed text-gray-900 dark:text-zinc-100"}>{hook}</p>
         </div>
       )}
 
       {/* Body */}
-      <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
-        <p className={`text-sm leading-[1.8] whitespace-pre-wrap ${isDark ? 'text-zinc-300' : 'text-gray-700'}`}>{mainBody}</p>
+      <div className={"p-4 rounded-xl border bg-gray-50 border-gray-200 dark:bg-white/5 dark:border-white/10"}>
+        <p className={"text-sm leading-[1.8] whitespace-pre-wrap text-gray-700 dark:text-zinc-300"}>{mainBody}</p>
       </div>
 
       {/* Hashtags */}
       {hashtags.length > 0 && (
-        <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
+        <div className={"p-4 rounded-xl border bg-gray-50 border-gray-200 dark:bg-white/5 dark:border-white/10"}>
           <div className="flex items-center justify-between mb-3">
-            <span className={`text-xs font-semibold uppercase tracking-widest ${isDark ? 'text-zinc-500' : 'text-gray-500'}`}>Hashtags</span>
+            <span className={"text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-zinc-500"}>Hashtags</span>
             <button
               onClick={copyAllTags}
               className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-600 transition-colors"
@@ -64,16 +61,12 @@ export function FacebookContent({ body }: Props) {
               <button
                 key={tag}
                 onClick={() => copyTag(tag)}
-                className={`group flex items-center gap-1 px-2.5 py-1 rounded-full border transition-all ${
-                  isDark 
-                    ? 'bg-zinc-800 border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/10' 
-                    : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
-                }`}
+                className={"group flex items-center gap-1 px-2.5 py-1 rounded-full border transition-all bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 dark:bg-zinc-800 dark:border-white/10 dark:hover:border-indigo-500/40 dark:hover:bg-indigo-500/10"}
               >
-                <span className={`text-xs transition-colors ${isDark ? 'text-zinc-400 group-hover:text-indigo-300' : 'text-gray-600 group-hover:text-indigo-500'}`}>{tag}</span>
+                <span className={"text-xs transition-colors text-gray-600 group-hover:text-indigo-500 dark:text-zinc-400 dark:group-hover:text-indigo-300"}>{tag}</span>
                 {copiedTag === tag
                   ? <Check size={9} className="text-emerald-500" />
-                  : <Copy size={9} className={`opacity-0 group-hover:opacity-100 transition-all ${isDark ? 'text-zinc-600 group-hover:text-indigo-400' : 'text-gray-400 group-hover:text-indigo-500'}`} />
+                  : <Copy size={9} className={"opacity-0 group-hover:opacity-100 transition-all text-gray-400 group-hover:text-indigo-500 dark:text-zinc-600 dark:group-hover:text-indigo-400"} />
                 }
               </button>
             ))}
