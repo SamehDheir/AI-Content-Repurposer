@@ -80,7 +80,7 @@ all — there is no 401 handler in `api.ts`.
 ### Smaller items
 
 - [x] **SSE token in query string** removed; the route uses the standard cookie guard and `EventSource` sends credentials.
-- [x] **`emailVerified` enforced** in `validateUser` (403). Existing accounts were grandfathered to verified by migration `20260723120000`. `POST /auth/resend-verification` added so an expired token is not a dead end.
+- [x] **`emailVerified` enforced** in `validateUser` (403). Existing accounts were grandfathered to verified so enforcement would not lock them out. *(That backfill migration was later folded into the Phase 3 squashed baseline; it is a no-op on a fresh database, which has no rows to grandfather.)* `POST /auth/resend-verification` added so an expired token is not a dead end.
 - [x] **Verification tokens now expire** after 24h via `emailVerificationExpires`.
 - [x] **CORS** driven by `CORS_ORIGINS`; the `https://your-domain.com` placeholder is gone.
 
@@ -101,20 +101,31 @@ Two defects in the new code, both caught before commit:
 
 ---
 
-## Phase 3 — Deploy readiness ⬜
+## Phase 3 — Deploy readiness ✅
 
-- [ ] **🔴 Migration history does not describe the schema.** Root cause: `.gitignore` contained `/prisma/migrations`, so **no migration was ever committed** — `20260420140011_init` existed only on one machine and the schema was evolved with `db push`. It never created the `User` table, the `Plan` enum, `Job.userId` or `Job.imageUrl`. Consequences: a fresh `migrate deploy` yields a schema the app cannot run against, and `migrate dev` demands a full database reset because it detects the drift. The ignore rule was removed in Phase 2 and both migrations committed; what remains is to generate a baseline migration reconciling `init` with the live schema, mark it applied with `prisma migrate resolve --applied`, and verify a from-scratch `migrate deploy` boots. **Until then, hand-write migration SQL and apply with `migrate deploy` only.** *(Discovered during Phase 2.)*
-- [ ] **🔴 The dev database is not the one in `docker-compose.yml`.** Compose starts `postgres:15` holding `ai_repurposer`, but `DATABASE_URL` targets `ai_content_repurposer_db` on a **native Windows PostgreSQL 18** that also binds `localhost:5432` and wins the loopback. The container is dead weight and `docker exec … psql` inspects the wrong server. Decide which one is authoritative and align compose, `.env` and the docs. *(Discovered during Phase 2.)*
-- [ ] **`Prisma.module.ts` capital `P`**, imported with *both* casings. Works on Windows, breaks the moment CI or Docker builds on Linux. `git mv` to `prisma.module.ts`.
-- [ ] **`npm run start:prod` is broken.** `prisma.config.ts` at the project root widens tsc's `rootDir`, so output lands at `dist/src/main.js`, not `dist/main.js`. Either exclude it from `tsconfig.build.json` or fix the script path.
+- [x] **🔴 Migration history did not describe the schema.** Root cause: `.gitignore` contained `/prisma/migrations`, so **no migration was ever committed** — the schema had been evolved with `db push` and nothing described the `User` table, the `Plan` enum, `Job.userId` or `Job.imageUrl`. Since the history had never been shared, it was squashed to a single baseline (`20260723140000_init`) generated from the live schema. The dev database's `_prisma_migrations` rows were replaced with `migrate resolve --applied` (metadata only — 11 users and 9 jobs untouched). Verified: `migrate deploy` against an empty database produces a schema with **zero drift** from `schema.prisma`, the app boots against it, and `migrate dev` no longer demands a reset.
+- [x] **🔴 The dev database was not the one in `docker-compose.yml`.** A native Windows PostgreSQL 18 also bound `localhost:5432` and won the loopback, so the container sat unused while the app talked to the native server. Compose is now authoritative: Postgres publishes on **5434**, Redis on **6380**, and `POSTGRES_DB` matches `DATABASE_URL`. Shifting off the default ports is what makes the collision impossible rather than merely unlikely.
+- [x] **`Prisma.module.ts`** renamed to `prisma.module.ts`; both importers updated.
+- [x] **`npm run start:prod`** fixed by setting an explicit `rootDir` and excluding `prisma.config.ts` from `tsconfig.build.json`, so the entrypoint compiles to `dist/main.js`. Verified end-to-end against the Docker database.
 - [x] **Port hardcoded** — now `process.env.PORT ?? 3001`.
 - [x] **Port collision resolved** by moving the *backend* to 3001 and leaving the frontend on Next's default 3000. `CORS_ORIGINS`, `FRONTEND_URL`, `GOOGLE_CALLBACK_URL` and `NEXT_PUBLIC_API_URL` were all realigned; see the table in [CLAUDE.md](CLAUDE.md).
-- [ ] **No `.env.example`** in either app. The backend `.env` also has duplicate `REDIS_PORT` and `GOOGLE_*` keys — dedupe.
-- [ ] **`yt-dlp` is an undeclared system dependency.** Document it and fail fast at boot with a clear message, rather than at attempt 3 of a job.
-- [ ] **No Dockerfile**; compose has only Postgres + Redis. Add Dockerfiles and app services. The backend image needs Python and `yt-dlp`.
-- [ ] **Unused dependencies.** Backend: `@google/generative-ai`, `youtube-captions-scraper`. Frontend: `ioredis` (a Node-only Redis client in a browser app). ⚠️ **`class-transformer` is now required** by `transform: true` — do not remove it.
-- [ ] **Orphan files.** `app.controller.ts` and `app.service.ts` are not registered in `AppModule`; `src/app/en/page.tsx` is a 5-line redirect to `/`.
-- [ ] Remove the obsolete `version:` key from `docker-compose.yml` (Compose warns on every invocation).
+- [x] **`.env.example`** added to both apps, documenting every key with its purpose. The backend `.env`'s duplicate `REDIS_PORT` and `GOOGLE_*` keys were deduped.
+- [x] **`yt-dlp` preflight.** `TranscriptionService.onModuleInit` probes for it and warns at boot with install instructions, instead of failing three retries deep in a job.
+- [x] **Dockerfiles** for both apps (multi-stage; the backend installs Python and `yt-dlp`, the frontend uses Next's `standalone` output), plus `.dockerignore` files. Compose gained `backend` and `frontend` services behind an **`apps` profile**, so the default `docker compose up -d` still starts only the datastores for local development.
+- [x] **Unused dependencies removed.** Backend: `@google/generative-ai`, `youtube-captions-scraper`. Frontend: `ioredis`. `class-transformer` was **kept** — `transform: true` needs it at runtime.
+- [x] **Orphan files deleted.** `app.controller.ts`, `app.service.ts`, `src/app/en/page.tsx`.
+- [x] Obsolete `version:` key removed from `docker-compose.yml`.
+
+### Verification performed
+
+- `migrate deploy` on an empty database → zero drift from `schema.prisma` (`migrate diff --exit-code` returns 0), app boots, `migrate dev` no longer demands a reset.
+- `npm run start:prod` starts against the Docker database and logs `yt-dlp 2026.03.17 detected`.
+- Both apps build; the Phase 2 suite still passes 22/22 against the freshly migrated database.
+- `docker compose config` validates; the default profile lists only `postgres` and `redis`.
+
+### Not verified
+
+The Docker **images have not been built successfully**. `docker build` was attempted on the backend and stalled pulling `node:22-bookworm-slim` — 7 MB of 50 MB after 500 s (~15 KB/s), so it was abandoned rather than left to run for an hour. The failure is network throughput, not the Dockerfile, but that means **both Dockerfiles remain unproven**: the compose file they plug into validates, and the build inputs (`npm ci`, `npm run build`, Next `standalone` output) all work outside Docker, but no image has actually been produced. Run `docker compose --profile apps build` on a decent connection before relying on them.
 
 ---
 
