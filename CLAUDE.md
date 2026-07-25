@@ -45,7 +45,7 @@ Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-
 ### Frontend (`ai-repurposer-frontend/`)
 
 ```bash
-npm run dev                   # :3000
+npm run dev                   # :3000 — port is pinned, see Ports below
 npm run build && npm start
 npm run lint
 ```
@@ -63,6 +63,15 @@ Frontend **3000**, backend **3001**. Four settings have to agree, and getting on
 | backend `FRONTEND_URL` | `http://localhost:3000` (verification and reset links) |
 | backend `GOOGLE_CALLBACK_URL` | `http://localhost:3001/auth/google/callback` |
 | frontend `NEXT_PUBLIC_API_URL` | `http://localhost:3001` |
+
+**The frontend scripts pin `-p 3000` on purpose.** Without an explicit port, `next dev` silently falls back to the next free one when 3000 is taken — which is **3001**, the backend's port. It then wins the race against a still-compiling Nest, the API dies on `EADDRINUSE` in the background, and every call from the browser hits the Next server instead: uniform `500 Internal Server Error` with no CORS headers on every endpoint, including `OPTIONS`. With `-p 3000` Next fails loudly instead. If the symptom ever reappears, check who actually owns the port before suspecting CORS:
+
+```bash
+netstat -ano | grep ":3001.*LISTENING"     # → PID
+powershell -Command "Get-CimInstance Win32_Process -Filter 'ProcessId=<PID>' | Select -Expand CommandLine"
+```
+
+Note also that `rm -rf .next` or a `next build` while `next dev` is running leaves the dev server serving 500s, and can truncate `.next/dev/types/routes.d.ts` — which is in `tsconfig.json`'s `include`, so the *next* build then fails with a bogus `Declaration or statement expected` in generated code. Stop the dev server first.
 
 ## Architecture
 
@@ -112,7 +121,18 @@ Two independent mechanisms, easy to confuse:
 - Backend filenames are all lowercase. `Prisma.module.ts` was renamed to `prisma.module.ts` because the mixed-casing imports only worked on Windows and broke on a case-sensitive filesystem — keep new files lowercase.
 - Frontend alias `@/*` maps to the **project root**, not `src/`, so imports read `@/src/lib/api`.
 - `main.ts` registers a global `ValidationPipe({ whitelist: true, transform: true })`, so every `@Body()` needs a DTO class to be validated — an inline object type silently skips validation entirely. DTOs live in `src/jobs/dto/` and `src/auth/dto/`. Note that `whitelist` strips undecorated properties, so a field without a decorator never reaches the handler.
-- Dark/light theming is threaded manually through `useTheme()` with ternaries on nearly every `className` rather than Tailwind's `dark:` variant — match that pattern when editing components.
 - Dashboard components (`JobCard`, `ContentViewer`, `UsageBanner`) are `React.lazy` + `Suspense` loaded; keep new heavy components on that path.
+
+### The design system ("Cutting Room")
+
+The marketing page, the dashboard and the auth pages share one system defined in [globals.css](ai-repurposer-frontend/src/app/globals.css). Read it before styling anything new.
+
+- **Theming is token-driven, not ternary-driven.** `.dark` / `.light` on `<html>` swap CSS variables, and `@theme inline` turns them into ordinary utilities: `bg-paper`, `bg-surface`, `text-ink` / `text-ink-2` / `text-ink-3`, `border-rule` / `border-rule-strong`, `text-signal`, `bg-signal-wash`, `bg-scrim`. Use those. Do **not** reintroduce `theme === 'dark' ? … : …` per-`className` ternaries — the older auth-adjacent pages (`forgot-password`, `reset-password`, `verify-email`, `auth/callback`) still do it and are the exception, not the pattern. `useTheme()` remains for behaviour (the toggle); the toggle's own icons swap via `.only-dark` / `.only-light` so they are right on first paint.
+- **`--signal-on-ink` exists for inverted bands.** On `bg-ink` the background is the *other* theme's paper, so a normal `text-signal` goes muddy. The homepage ticker and the login side panel use it.
+- **Four riso inks, one per output format** — `--fmt-thread`, `--fmt-blog`, `--fmt-social`, `--fmt-marks`. They appear as hairlines, dots and small rules only, never as gradients, and the same colour tracks a format from the homepage specimen to the ledger row to the viewer's index tab.
+- **Type**: `.display` (Newsreader, the editorial serif — add `.display-xl` for settings above ~2.5rem), `.label` (11px mono caps, 0.13em, the metadata slug that opens most blocks), `.slug` (mono, tabular, for URLs, ids and timecodes). Newsreader replaced Instrument Serif because a high-contrast display face went faint at small sizes and on the dark theme.
+- **Motion** lives in `cr-*` keyframes in globals.css and is applied via inline `style={{ animation: … }}` or the `.anim-*` helpers. Scroll reveals go through `<Reveal>` / `useReveal`, which shares one IntersectionObserver across the page. Everything is disabled under `prefers-reduced-motion`.
+- Corners are square (or ≤2px), depth is a hard offset shadow (`.plate`, or `shadow-[4px_4px_0_var(--rule-strong)]`) rather than a blur, and `.hatch` / `.gridlines` / `.regmark` supply the print furniture.
+- `layout.tsx` runs a pre-paint inline script that sets the theme class before React hydrates; without it the whole page flashes in the wrong theme.
 - Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer.
 - Adding a `ContentType` requires changes in four places: the Prisma enum, `CONTENT_TYPES` in the processor, `PROMPTS` in `ai.service.ts`, and the frontend `TABS`/content components.

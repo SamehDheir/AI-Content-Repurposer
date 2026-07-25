@@ -1,17 +1,11 @@
 "use client";
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
-import { useTheme } from "@/src/contexts/ThemeContext";
 import { extractHashtags, extractHook } from "./parsers";
 
-interface Props { body: string }
-
-export function FacebookContent({ body }: Props) {
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+export function FacebookContent({ body }: { body: string }) {
   const hashtags = extractHashtags(body);
   const hook = extractHook(body);
-  const mainBody = body.replace(hook, "").replace(/#\w+/g, "").trim();
+  const main = body.replace(hook, "").replace(/#\w+/g, "").trim();
   const [copiedTag, setCopiedTag] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
 
@@ -21,60 +15,43 @@ export function FacebookContent({ body }: Props) {
     setTimeout(() => setCopiedTag(null), 1500);
   };
 
-  const copyAllTags = async () => {
+  const copyAll = async () => {
     await navigator.clipboard.writeText(hashtags.join(" "));
     setCopiedAll(true);
     setTimeout(() => setCopiedAll(false), 1500);
   };
 
   return (
-    <div className="space-y-4">
-      {/* Hook */}
+    <div>
       {hook && (
-        <div className={`relative p-4 rounded-xl bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border ${isDark ? 'border-indigo-500/20' : 'border-indigo-300'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-            <span className="text-xs font-semibold text-indigo-500 uppercase tracking-widest">Hook</span>
-          </div>
-          <p className={`text-sm font-medium leading-relaxed ${isDark ? 'text-zinc-100' : 'text-gray-900'}`}>{hook}</p>
+        <div className="border-l-2 border-fmt-social bg-surface px-5 py-4">
+          <span className="label mb-2 block text-fmt-social">Hook</span>
+          <p className="text-[16px] font-medium leading-[1.6] text-ink">{hook}</p>
         </div>
       )}
 
-      {/* Body */}
-      <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
-        <p className={`text-sm leading-[1.8] whitespace-pre-wrap ${isDark ? 'text-zinc-300' : 'text-gray-700'}`}>{mainBody}</p>
-      </div>
+      <p className="mt-6 whitespace-pre-wrap text-[14.5px] leading-[1.8] text-ink-2">{main}</p>
 
-      {/* Hashtags */}
       {hashtags.length > 0 && (
-        <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-gray-50 border-gray-200'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <span className={`text-xs font-semibold uppercase tracking-widest ${isDark ? 'text-zinc-500' : 'text-gray-500'}`}>Hashtags</span>
+        <div className="mt-8 border-t border-rule pt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="label text-ink-3">Hashtags</span>
             <button
-              onClick={copyAllTags}
-              className="flex items-center gap-1.5 text-xs text-indigo-500 hover:text-indigo-600 transition-colors"
+              onClick={copyAll}
+              className="label text-ink-3 transition-colors hover:text-signal"
               aria-label="Copy all hashtags"
             >
-              {copiedAll ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-              {copiedAll ? "Copied!" : "Copy all"}
+              {copiedAll ? "Copied ✓" : "Copy all"}
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {hashtags.map((tag) => (
               <button
                 key={tag}
                 onClick={() => copyTag(tag)}
-                className={`group flex items-center gap-1 px-2.5 py-1 rounded-full border transition-all ${
-                  isDark 
-                    ? 'bg-zinc-800 border-white/10 hover:border-indigo-500/40 hover:bg-indigo-500/10' 
-                    : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'
-                }`}
+                className="slug border border-rule px-2.5 py-1 text-[12px] text-ink-2 transition-colors hover:border-fmt-social hover:text-fmt-social"
               >
-                <span className={`text-xs transition-colors ${isDark ? 'text-zinc-400 group-hover:text-indigo-300' : 'text-gray-600 group-hover:text-indigo-500'}`}>{tag}</span>
-                {copiedTag === tag
-                  ? <Check size={9} className="text-emerald-500" />
-                  : <Copy size={9} className={`opacity-0 group-hover:opacity-100 transition-all ${isDark ? 'text-zinc-600 group-hover:text-indigo-400' : 'text-gray-400 group-hover:text-indigo-500'}`} />
-                }
+                {copiedTag === tag ? "copied ✓" : tag}
               </button>
             ))}
           </div>

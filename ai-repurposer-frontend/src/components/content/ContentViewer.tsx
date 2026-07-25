@@ -1,269 +1,264 @@
 "use client";
-import { useState, useCallback } from "react";
-import { Copy, Check, X, Image as ImageIcon, Sparkles, ZoomIn, ZoomOut, Download } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { type Job, type ContentType, api } from "@/src/lib/api";
 import { TABS } from "./types";
-import { TwitterContent }    from "./TwitterContent";
-import { BlogContent }       from "./BlogContent";
-import { FacebookContent }   from "./FacebookContent";
+import { TwitterContent } from "./TwitterContent";
+import { BlogContent } from "./BlogContent";
+import { FacebookContent } from "./FacebookContent";
 import { HighlightsContent } from "./HighlightsContent";
-import { useTheme } from "@/src/contexts/ThemeContext";
 
 interface Props {
-  job:     Job;
+  job: Job;
   onClose: () => void;
   onJobUpdate?: (job: Job) => void;
 }
 
+/**
+ * The layout sheet. Index tabs run down the left margin the way they would on a
+ * folder of proofs; the sheet itself is plain paper so the generated copy is
+ * the only thing with any colour on it.
+ */
 export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
-  const { theme } = useTheme();
-  const [tab, setTab]         = useState<ContentType>("TWITTER_THREAD");
-  const [copied, setCopied]   = useState(false);
-  const [editedBodies, setEditedBodies] = useState<Partial<Record<ContentType, string>>>({});
-  const [generatingImage, setGeneratingImage] = useState(false);
-  const [imageZoomed, setImageZoomed] = useState(false);
-  const [localImageUrl, setLocalImageUrl] = useState<string | null>(job.imageUrl || null);
+  const [tab, setTab] = useState<ContentType>("TWITTER_THREAD");
+  const [copied, setCopied] = useState(false);
+  const [edited, setEdited] = useState<Partial<Record<ContentType, string>>>({});
+  const [plating, setPlating] = useState(false);
+  const [plateError, setPlateError] = useState("");
+  const [zoomed, setZoomed] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(job.imageUrl ?? null);
 
-  const getBody = (t: ContentType) =>
-    editedBodies[t] ?? job.generatedContent.find((c) => c.type === t)?.body ?? "";
+  const bodyOf = (t: ContentType) =>
+    edited[t] ?? job.generatedContent.find((c) => c.type === t)?.body ?? "";
 
-  const body = getBody(tab);
+  const body = bodyOf(tab);
+  const active = TABS.find((t) => t.key === tab)!;
 
-  const handleCopy = async () => {
+  // Escape closes, and the page behind must not scroll while the sheet is up.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  const copy = async () => {
     await navigator.clipboard.writeText(body);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1800);
   };
 
-  const handleBlogEdit = useCallback((val: string) => {
-    setEditedBodies((prev) => ({ ...prev, BLOG_POST: val }));
+  const editBlog = useCallback((val: string) => {
+    setEdited((prev) => ({ ...prev, BLOG_POST: val }));
   }, []);
 
-  const handleGenerateImage = async () => {
-    setGeneratingImage(true);
+  const makePlate = async () => {
+    setPlating(true);
+    setPlateError("");
     try {
-      const result = await api.generateImageForJob(job.id);
-      setLocalImageUrl(result.imageUrl);
-      onJobUpdate?.({ ...job, imageUrl: result.imageUrl });
-    } catch (error: any) {
-      console.error('Failed to generate image:', error);
-      alert('Failed to generate image. Please try again.');
+      const { imageUrl: url } = await api.generateImageForJob(job.id);
+      setImageUrl(url);
+      onJobUpdate?.({ ...job, imageUrl: url });
+    } catch (err) {
+      setPlateError(err instanceof Error ? err.message : "Could not render the plate.");
     } finally {
-      setGeneratingImage(false);
+      setPlating(false);
     }
   };
 
-  const handleZoom = () => {
-    setImageZoomed(!imageZoomed);
-  };
-
-  const handleDownload = async () => {
-    const imageUrl = localImageUrl || job.imageUrl;
+  const download = async () => {
     if (!imageUrl) return;
     try {
-      const response = await fetch(imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `featured-image-${job.id}.png`;
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `plate-${job.id.slice(0, 8)}.png`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Failed to download image:', error);
-      alert('Failed to download image. Please try again.');
+      URL.revokeObjectURL(href);
+      a.remove();
+    } catch {
+      setPlateError("Could not download the plate.");
     }
-  };
-
-  // Close on backdrop click
-  const handleBackdrop = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
   };
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 md:p-4 bg-black/70 backdrop-blur-sm"
-      onClick={handleBackdrop}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-0 backdrop-blur-sm sm:p-5"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Generated pieces"
     >
       <div
-        className={`relative w-full max-w-2xl max-h-[90vh] md:max-h-[88vh] flex flex-col rounded-2xl overflow-hidden shadow-2xl ${
-          theme === 'dark' ? 'bg-[#141416] border-white/8' : 'bg-white border-gray-200'
-        }`}
-        onClick={(e) => e.stopPropagation()}
+        className="flex h-full w-full max-w-5xl flex-col border-rule-strong bg-paper sm:h-auto sm:max-h-[92vh] sm:flex-row sm:border"
+        style={{ animation: "cr-rise 0.45s cubic-bezier(.16,.84,.28,1) both" }}
       >
-        {/* Subtle top glow */}
-        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent pointer-events-none" />
-
-        {/* ── Header ── */}
-        <div className={`flex items-center justify-between px-4 md:px-5 py-3 md:py-4 border-b ${theme === 'dark' ? 'border-white/8' : 'border-gray-200'}`}>
-          <div className="flex items-center gap-2.5">
-            <div className="w-2 h-2 rounded-full bg-indigo-500/70" />
-            <span className={`text-sm font-semibold tracking-tight ${theme === 'dark' ? 'text-zinc-100' : 'text-gray-900'}`}>
-              Generated content
-            </span>
-          </div>
-          <button
-            onClick={onClose}
-            className={`w-8 h-8 md:w-7 md:h-7 rounded-lg flex items-center justify-center transition-all ${
-              theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300 hover:bg-white/10' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-            }`}
-            aria-label="Close"
-          >
-            <X size={15} />
-          </button>
-        </div>
-
-        {/* ── Generated Image ── */}
-        {(localImageUrl || job.imageUrl || generatingImage) && (
-          <div className={`px-5 py-3 border-b ${theme === 'dark' ? 'border-white/8' : 'border-gray-200'} bg-zinc-900/50`}>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <ImageIcon size={12} className="text-indigo-400" />
-                <span className="text-xs font-medium text-black dark:text-zinc-500">
-                  {generatingImage ? "Generating Image..." : "Featured Image"}
-                </span>
-              </div>
-              {!generatingImage && (localImageUrl || job.imageUrl) && (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleZoom}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-white/10 transition-all"
-                    title={imageZoomed ? "Zoom out" : "Zoom in"}
-                  >
-                    {imageZoomed ? <ZoomOut size={13} /> : <ZoomIn size={13} />}
-                  </button>
-                  <button
-                    onClick={handleDownload}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-500 hover:text-zinc-300 hover:bg-white/10 transition-all"
-                    title="Download image"
-                  >
-                    <Download size={13} />
-                  </button>
-                </div>
-              )}
-            </div>
-            {generatingImage ? (
-              <div className="rounded-lg overflow-hidden border border-white/10 mx-auto max-h-32 w-48 flex items-center justify-center bg-zinc-800">
-                <div className="flex flex-col items-center gap-2 py-6">
-                  <div className="w-6 h-6 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
-                  <span className="text-xs text-zinc-400">Generating...</span>
-                </div>
-              </div>
-            ) : (
-              <div 
-                className={`rounded-lg overflow-hidden border border-white/10 mx-auto transition-all ${
-                  imageZoomed ? "max-h-96 w-full" : "max-h-32 w-48"
-                }`}
-              >
-                <img
-                  src={localImageUrl || job.imageUrl}
-                  alt="Generated featured image"
-                  className="w-full h-full object-contain bg-zinc-800"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Tabs ── */}
-        <div className={`flex items-center gap-1 px-4 md:px-5 pt-3 pb-0 border-b ${theme === 'dark' ? 'border-white/8' : 'border-gray-200'}`}>
+        {/* ── Index tabs, down the margin ── */}
+        <nav
+          className="hidden w-12 shrink-0 flex-col border-r border-rule sm:flex"
+          aria-label="Formats"
+        >
           {TABS.map((t) => {
-            const hasContent = !!getBody(t.key);
-            const isActive   = tab === t.key;
+            const has = !!bodyOf(t.key);
+            const on = tab === t.key;
             return (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                disabled={!hasContent}
-                className={`relative flex items-center gap-1.5 px-2 md:px-3 py-2 -mb-px text-xs font-medium transition-all rounded-t-lg ${
-                  isActive
-                    ? `${theme === 'dark' ? 'text-zinc-100 bg-white/8 border-white/10' : 'text-gray-900 bg-gray-100 border-gray-300'} border-b-${theme === 'dark' ? '[#141416]' : 'white'}`
-                    : hasContent
-                    ? `${theme === 'dark' ? 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`
-                    : `${theme === 'dark' ? 'text-zinc-700' : 'text-gray-400'} cursor-not-allowed`
+                disabled={!has}
+                aria-pressed={on}
+                className={`group relative flex flex-1 flex-col items-center justify-center gap-3 border-b border-rule transition-colors last:border-b-0 ${
+                  on ? "text-paper" : has ? "text-ink-3 hover:text-ink" : "text-ink-3/40"
                 }`}
-                aria-label={`Switch to ${t.label} tab`}
+                style={{ background: on ? t.ink : undefined }}
               >
-                <span className="text-[11px] opacity-70">{t.icon}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-                {isActive && (
-                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-indigo-500 rounded-full" />
-                )}
+                <span className="label">{t.plate}</span>
+                <span
+                  className="label whitespace-nowrap"
+                  style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                >
+                  {t.label}
+                </span>
+                {!has && <span className="label absolute bottom-3">—</span>}
               </button>
             );
           })}
-        </div>
+        </nav>
 
-        {/* ── Content area ── */}
-        <div className={`flex-1 overflow-y-auto px-4 md:px-5 py-4 md:py-5 scrollbar-thin scrollbar-track-transparent ${
-          theme === 'dark' ? 'scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20' : 'scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400'
-        }`}>
-          {!body ? (
-            <div className="flex items-center justify-center h-32">
-              <p className={`text-sm ${theme === 'dark' ? 'text-zinc-600' : 'text-gray-500'}`}>No content available.</p>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* ── Head ── */}
+          <header className="flex items-start justify-between gap-4 border-b border-rule px-5 py-4">
+            <div className="min-w-0">
+              <span className="label flex items-center gap-2 text-ink-3">
+                <span className="h-1.5 w-1.5" style={{ background: active.ink }} />
+                Sheet {job.id.slice(0, 8).toUpperCase()} · {job.language}
+              </span>
+              <p className="slug mt-2 truncate text-[13px] text-ink-2">
+                {job.videoUrl.replace(/^https?:\/\/(www\.)?/, "")}
+              </p>
             </div>
-          ) : (
-            <>
-              {tab === "TWITTER_THREAD" && <TwitterContent body={body} />}
-              {tab === "BLOG_POST"      && <BlogContent body={body} onBodyChange={handleBlogEdit} />}
-              {tab === "FACEBOOK_POST"  && <FacebookContent body={body} />}
-              {tab === "HIGHLIGHTS"     && <HighlightsContent body={body} />}
-            </>
-          )}
-        </div>
-
-        {/* ── Footer ── */}
-        <div className={`flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 px-4 md:px-5 py-3 md:py-3.5 border-t ${
-          theme === 'dark' ? 'border-white/8 bg-white/3' : 'border-gray-200 bg-gray-50'
-        }`}>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/60" />
-            <span className={`text-xs ${theme === 'dark' ? 'text-zinc-600' : 'text-gray-500'}`}>
-              {body.length.toLocaleString()} chars
-            </span>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            {!localImageUrl && !job.imageUrl && (
-              <button
-                onClick={handleGenerateImage}
-                disabled={generatingImage}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                  generatingImage
-                    ? "bg-zinc-700 text-zinc-400 cursor-not-allowed"
-                    : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-500/20"
-                } min-h-[44px]`}
-                aria-label="Generate image"
-              >
-                {generatingImage ? (
-                  <>
-                    <span className="w-3 h-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={13} />
-                    <span className="hidden sm:inline">Generate Image</span>
-                    <span className="sm:hidden">Generate</span>
-                  </>
-                )}
-              </button>
-            )}
             <button
-              onClick={handleCopy}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                copied
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                  : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20"
-              } min-h-[44px]`}
-              aria-label="Copy content"
+              onClick={onClose}
+              className="label flex h-8 shrink-0 items-center gap-2 border border-rule px-3 text-ink-3 transition-colors hover:border-signal hover:text-signal"
+              aria-label="Close"
             >
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              <span className="hidden sm:inline">{copied ? "Copied!" : "Copy all"}</span>
-              <span className="sm:hidden">{copied ? "Copied" : "Copy"}</span>
+              Close ✕
             </button>
+          </header>
+
+          {/* ── Mobile tabs ── */}
+          <div className="flex border-b border-rule sm:hidden">
+            {TABS.map((t) => {
+              const has = !!bodyOf(t.key);
+              const on = tab === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  disabled={!has}
+                  className={`label flex-1 border-r border-rule py-3 last:border-r-0 ${
+                    on ? "text-paper" : has ? "text-ink-3" : "text-ink-3/40"
+                  }`}
+                  style={{ background: on ? t.ink : undefined }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
+
+          {/* ── Plate ── */}
+          {imageUrl && (
+            <div className="flex items-start gap-4 border-b border-rule bg-surface px-5 py-4">
+              <button
+                onClick={() => setZoomed((v) => !v)}
+                className={`shrink-0 overflow-hidden border border-rule transition-all duration-300 ${
+                  zoomed ? "h-48 w-full sm:w-80" : "h-16 w-28"
+                }`}
+                aria-label={zoomed ? "Shrink the plate" : "Enlarge the plate"}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imageUrl} alt="Generated featured image" className="h-full w-full object-cover" />
+              </button>
+              <div className="min-w-0">
+                <span className="label text-ink-3">Plate 01 · featured image</span>
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={download}
+                    className="label border border-rule px-3 py-1.5 text-ink-2 transition-colors hover:border-signal hover:text-signal"
+                  >
+                    Download
+                  </button>
+                  <button
+                    onClick={() => setZoomed((v) => !v)}
+                    className="label border border-rule px-3 py-1.5 text-ink-2 transition-colors hover:border-signal hover:text-signal"
+                  >
+                    {zoomed ? "Shrink" : "Enlarge"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Sheet ── */}
+          <div className="sheet min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+            {!body ? (
+              <p className="label py-16 text-center text-ink-3">Nothing was cut for this format.</p>
+            ) : (
+              <>
+                {tab === "TWITTER_THREAD" && <TwitterContent body={body} />}
+                {tab === "BLOG_POST" && <BlogContent body={body} onBodyChange={editBlog} />}
+                {tab === "FACEBOOK_POST" && <FacebookContent body={body} />}
+                {tab === "HIGHLIGHTS" && <HighlightsContent body={body} />}
+              </>
+            )}
+          </div>
+
+          {/* ── Foot ── */}
+          <footer className="flex flex-col gap-3 border-t border-rule px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="label text-ink-3">
+              {body.length.toLocaleString()} characters set
+            </span>
+            <div className="flex gap-2">
+              {!imageUrl && (
+                <button
+                  onClick={makePlate}
+                  disabled={plating}
+                  className="label flex h-10 items-center gap-2 border border-rule-strong px-4 text-ink transition-colors hover:border-signal hover:text-signal disabled:text-ink-3"
+                >
+                  {plating ? (
+                    <>
+                      <span
+                        className="h-2.5 w-2.5 border border-current"
+                        style={{ animation: "cr-spin 0.9s linear infinite" }}
+                      />
+                      Rendering
+                    </>
+                  ) : (
+                    "Make a plate"
+                  )}
+                </button>
+              )}
+              <button
+                onClick={copy}
+                className="label group flex h-10 items-center gap-2 bg-signal px-5 text-signal-ink transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_var(--rule-strong)]"
+              >
+                {copied ? "Copied ✓" : "Copy all"}
+              </button>
+            </div>
+          </footer>
+
+          {plateError && (
+            <p className="border-t border-signal bg-signal-wash px-5 py-2.5 text-[13px] text-ink">
+              {plateError}
+            </p>
+          )}
         </div>
       </div>
     </div>
