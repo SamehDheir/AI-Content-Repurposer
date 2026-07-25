@@ -26,11 +26,15 @@ export function FacebookContent({ body }: { body: string }) {
       {hook && (
         <div className="border-l-2 border-fmt-social bg-surface px-5 py-4">
           <span className="label mb-2 block text-fmt-social">Hook</span>
-          <p className="text-[16px] font-medium leading-[1.6] text-ink">{hook}</p>
+          <p dir="auto" className="text-[16px] font-medium leading-[1.6] text-ink">
+            {hook}
+          </p>
         </div>
       )}
 
-      <p className="mt-6 whitespace-pre-wrap text-[14.5px] leading-[1.8] text-ink-2">{main}</p>
+      <p dir="auto" className="mt-6 whitespace-pre-wrap text-[14.5px] leading-[1.8] text-ink-2">
+        {main}
+      </p>
 
       {hashtags.length > 0 && (
         <div className="mt-8 border-t border-rule pt-4">

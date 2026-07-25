@@ -160,7 +160,7 @@ export function Pipeline() {
   const progress = useRailProgress(rail);
 
   return (
-    <section id="pipeline" className="border-b border-rule py-20 sm:py-28">
+    <section id="pipeline" className="scroll-mt-20 border-b border-rule py-20 sm:py-28">
       <div className="mx-auto max-w-340 px-5 sm:px-8">
         <SectionHead
           index="02"

@@ -57,7 +57,7 @@ export function Colophon({
                 <Mark size={20} />
                 <span className="display text-lg">AI Repurposer</span>
               </div>
-              <p className="label mt-4 max-w-xs leading-[1.9] text-ink-3">
+              <p className="mt-4 max-w-xs text-[12.5px] leading-[1.7] text-ink-3">
                 Set in Newsreader and Geist.
                 <br />
                 Cut in {year}.

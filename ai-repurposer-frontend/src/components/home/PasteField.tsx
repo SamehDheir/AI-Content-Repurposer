@@ -71,18 +71,19 @@ export function PasteField({ authed, onSubmit, className = "", compact = false }
         </button>
       </div>
 
-      <p className="label mt-3 flex items-center gap-2 text-ink-3">
+      {/* Sentence case: these read as a note to the reader, not as a slug. */}
+      <p className="mt-3 flex items-center gap-2 text-[12.5px] leading-[1.6] text-ink-3">
         {looksWrong ? (
-          <span className="text-signal">Expects a youtube link — we&apos;ll try anyway</span>
+          <span className="text-signal">Expects a YouTube link — we&apos;ll try anyway.</span>
         ) : authed ? (
           <>
-            <span className="h-1.5 w-1.5 bg-fmt-social" />
-            Signed in — this drops straight onto your desk
+            <span className="h-1.5 w-1.5 shrink-0 bg-fmt-social" />
+            Signed in — this drops straight onto your desk.
           </>
         ) : (
           <>
-            <span className="h-1.5 w-1.5 bg-signal" />
-            Free plan · 1 video a month · no card
+            <span className="h-1.5 w-1.5 shrink-0 bg-signal" />
+            Free plan: one video a month, no card.
           </>
         )}
       </p>
