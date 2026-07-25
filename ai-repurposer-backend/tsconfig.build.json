@@ -4,7 +4,12 @@
     // Without an explicit rootDir, prisma.config.ts at the project root widens
     // the inferred root and the entrypoint compiles to dist/src/main.js, so
     // `node dist/main` (start:prod) cannot find it.
-    "rootDir": "./src"
+    "rootDir": "./src",
+    // Keep the incremental build state inside dist. At the default project-root
+    // location it outlives `deleteOutDir`, and tsc then believes an already
+    // deleted dist/ is up to date: "Found 0 errors", no emit, and
+    // `node dist/main` fails with MODULE_NOT_FOUND.
+    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
   },
   "exclude": [
     "node_modules",
