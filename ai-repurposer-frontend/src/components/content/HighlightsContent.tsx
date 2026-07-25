@@ -1,5 +1,5 @@
 "use client";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { parseHighlights } from "./parsers";
 
 const DARK_COLORS = [

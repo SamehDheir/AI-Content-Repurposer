@@ -1,14 +1,14 @@
 "use client";
 import { useState, lazy, Suspense } from "react";
-import { useJobs }  from "@/src/hooks/useJobs";
-import { api, type Job } from "@/src/lib/api";
+import { useJobs }  from "@/features/jobs/useJobs";
+import { api, type Job } from "@/lib/api";
 import { Sparkles, LogOut, Plus, AlertCircle, Moon, Sun } from "lucide-react";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // Lazy load heavy components
-const JobCard = lazy(() => import("@/src/components/JobCard").then(m => ({ default: m.JobCard })));
-const ContentViewer = lazy(() => import("@/src/components/content").then(m => ({ default: m.ContentViewer })));
-const UsageBanner = lazy(() => import("@/src/components/UsageBanner").then(m => ({ default: m.UsageBanner })));
+const JobCard = lazy(() => import("@/features/jobs/JobCard").then(m => ({ default: m.JobCard })));
+const ContentViewer = lazy(() => import("@/components/content").then(m => ({ default: m.ContentViewer })));
+const UsageBanner = lazy(() => import("@/components/ui/UsageBanner").then(m => ({ default: m.UsageBanner })));
 
 export default function DashboardPage() {
   const { jobs, loading, error, refetch, updateJob } = useJobs();

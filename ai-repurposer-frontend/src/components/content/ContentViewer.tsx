@@ -1,13 +1,13 @@
 "use client";
 import { useState, useCallback } from "react";
 import { Copy, Check, X, Image as ImageIcon, Sparkles, ZoomIn, ZoomOut, Download } from "lucide-react";
-import { type Job, type ContentType, api } from "@/src/lib/api";
+import { type Job, type ContentType, api } from "@/lib/api";
 import { TABS } from "./types";
 import { TwitterContent }    from "./TwitterContent";
 import { BlogContent }       from "./BlogContent";
 import { FacebookContent }   from "./FacebookContent";
 import { HighlightsContent } from "./HighlightsContent";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Props {
   job:     Job;

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { extractHashtags, extractHook } from "./parsers";
 
 interface Props { body: string }

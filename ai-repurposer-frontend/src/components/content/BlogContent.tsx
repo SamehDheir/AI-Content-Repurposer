@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface Props {
   body: string;

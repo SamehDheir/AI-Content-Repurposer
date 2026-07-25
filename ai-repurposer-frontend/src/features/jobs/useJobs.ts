@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { api, type Job } from '@/src/lib/api';
+import { api, type Job } from '@/lib/api';
 
 export function useJobs() {
   const [jobs, setJobs]       = useState<Job[]>([]);

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useRef } from 'react';
-import { type Job } from '@/src/lib/api';
+import { type Job } from '@/lib/api';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 

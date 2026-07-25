@@ -1,7 +1,7 @@
 "use client";
-import { type Job, type JobStatus } from "@/src/lib/api";
-import { useJobSSE } from "@/src/hooks/useJobSSE";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { type Job, type JobStatus } from "@/lib/api";
+import { useJobSSE } from "@/features/jobs/useJobSSE";
+import { useTheme } from "@/contexts/ThemeContext";
 import { ExternalLink, Loader2, CheckCircle2, XCircle, Clock, Image as ImageIcon } from "lucide-react";
 
 const STATUS_CONFIG: Record<JobStatus, {

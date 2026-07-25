@@ -2,8 +2,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Play, Zap, Image as ImageIcon, Check, ArrowRight, Menu, X, Moon, Sun } from "lucide-react";
-import { useTheme } from "@/src/contexts/ThemeContext";
-import { api } from "@/src/lib/api";
+import { useTheme } from "@/contexts/ThemeContext";
+import { api } from "@/lib/api";
 
 export default function Home() {
   const router = useRouter();
