@@ -64,7 +64,9 @@ export function UsageBanner() {
       </span>
 
       {spent && (
-        <span className="label text-signal">— next month, or go Pro</span>
+        <span className="text-[12.5px] leading-[1.6] text-signal">
+          — next month, or go Pro.
+        </span>
       )}
     </div>
   );

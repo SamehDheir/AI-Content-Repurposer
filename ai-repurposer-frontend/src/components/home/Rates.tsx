@@ -65,7 +65,7 @@ function Column({
 
 export function Rates({ onEnter }: { onEnter: () => void }) {
   return (
-    <section id="rates" className="border-b border-rule py-20 sm:py-28">
+    <section id="rates" className="scroll-mt-20 border-b border-rule py-20 sm:py-28">
       <div className="mx-auto max-w-340 px-5 sm:px-8">
         <SectionHead
           index="04"

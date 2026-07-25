@@ -44,14 +44,24 @@ export default function ForgotPasswordPage() {
           its way. It is good for one hour.
         </p>
         <dl className="mt-6 border-t border-rule">
-          {[
-            ["Sent to", email],
-            ["Good for", "1 hour"],
-            ["Next", "Open the link, set a new password"],
-          ].map(([k, v]) => (
+          {/* Mono is for the data — an address, a duration. The instruction is a
+              sentence and gets set as one. */}
+          {([
+            ["Sent to", email, true],
+            ["Good for", "1 hour", true],
+            ["Next", "Open the link and set a new password.", false],
+          ] as [string, string, boolean][]).map(([k, v, mono]) => (
             <div key={k} className="flex gap-4 border-b border-rule py-2.5">
               <dt className="label w-20 shrink-0 text-ink-3">{k}</dt>
-              <dd className="slug min-w-0 truncate text-[12.5px] text-ink-2">{v}</dd>
+              <dd
+                className={
+                  mono
+                    ? "slug min-w-0 truncate text-[12.5px] text-ink-2"
+                    : "min-w-0 text-[12.5px] leading-[1.6] text-ink-2"
+                }
+              >
+                {v}
+              </dd>
             </div>
           ))}
         </dl>

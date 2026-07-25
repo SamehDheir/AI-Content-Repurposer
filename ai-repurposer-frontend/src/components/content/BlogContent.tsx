@@ -6,6 +6,12 @@ interface Props {
   onBodyChange?: (val: string) => void;
 }
 
+/**
+ * Hebrew, Arabic and the Arabic presentation forms. Escapes, not literals,
+ * so an editor's own bidi handling cannot scramble the line.
+ */
+const RTL_START = /^[֑-߿יִ-﷽ﹰ-ﻼ]/;
+
 function render(text: string) {
   let firstParagraph = true;
 
@@ -61,14 +67,18 @@ function render(text: string) {
         </ol>
       );
 
-    const dropCap = firstParagraph && para.length > 90;
+    // Latin only. Arabic is cursive, so lifting the first letter out of a word
+    // strips its joining form and leaves the rest of the word visibly broken —
+    // a drop cap is not a thing that transfers to the script.
+    const dropCap =
+      firstParagraph && para.length > 90 && !RTL_START.test(para.trimStart());
     firstParagraph = false;
 
     return (
       <p key={idx} className="mb-4 text-[14.5px] leading-[1.85] text-ink-2">
         {dropCap ? (
           <>
-            <span className="display float-left mr-2.5 mt-1.5 text-[3.2rem] leading-[0.72] text-fmt-blog">
+            <span className="display float-start me-2.5 mt-1.5 text-[3.2rem] leading-[0.72] text-fmt-blog">
               {para.charAt(0)}
             </span>
             {para.slice(1)}
@@ -99,6 +109,7 @@ export function BlogContent({ body, onBodyChange }: Props) {
         </div>
         <textarea
           ref={ref}
+          dir="auto"
           defaultValue={body}
           onChange={(e) => onBodyChange?.(e.target.value)}
           className="slug min-h-[420px] w-full resize-none border border-rule bg-surface p-4 text-[13px] leading-[1.8] text-ink outline-none transition-colors focus:border-signal"
@@ -109,8 +120,10 @@ export function BlogContent({ body, onBodyChange }: Props) {
   }
 
   return (
-    <div className="group relative cursor-text" onClick={() => setEditing(true)}>
-      <span className="label absolute -top-1 right-0 bg-paper px-2 py-1 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
+    // A blog post is one language throughout, so `auto` on the wrapper settles
+    // the whole thing off its first strong character.
+    <div dir="auto" className="group relative cursor-text" onClick={() => setEditing(true)}>
+      <span className="label absolute -top-1 end-0 bg-paper px-2 py-1 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">
         Click to mark up
       </span>
       {render(body)}

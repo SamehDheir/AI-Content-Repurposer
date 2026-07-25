@@ -15,29 +15,42 @@ const RUNNERS = [
   "YT-DLP FALLBACK",
 ];
 
+/** Repeats inside each half. Two halves of one repeat left a visible gap at the
+ *  loop point above ~1400px, because the keyframe travels exactly half the
+ *  track: if half a track is narrower than the viewport, the tail shows. Three
+ *  repeats puts a half at roughly 4000px, past any real display. */
+const REPEATS = 3;
+
 function Row({
   children,
-  duration,
+  seconds,
   reverse = false,
   className = "",
 }: {
   children: React.ReactNode;
-  duration: string;
+  /** Seconds for ONE repeat; scaled by REPEATS so the speed stays put. */
+  seconds: number;
   reverse?: boolean;
   className?: string;
 }) {
+  const half = Array.from({ length: REPEATS }, (_, i) => (
+    <span key={i} className="flex shrink-0 items-center">
+      {children}
+    </span>
+  ));
+
   return (
     <div className={`overflow-hidden ${className}`}>
       <div
         className="anim-marquee flex w-max items-center"
         style={{
-          ["--marquee-duration" as string]: duration,
+          ["--marquee-duration" as string]: `${seconds * REPEATS}s`,
           animationDirection: reverse ? "reverse" : undefined,
         }}
       >
-        {/* Duplicated once; the keyframe travels exactly one copy's width. */}
-        {children}
-        {children}
+        {/* Two identical halves; the keyframe travels exactly one half. */}
+        <span className="flex shrink-0 items-center">{half}</span>
+        <span className="flex shrink-0 items-center">{half}</span>
       </div>
     </div>
   );
@@ -68,10 +81,10 @@ export function Ticker() {
 
   return (
     <section aria-hidden="true" className="border-b border-rule">
-      <Row duration="38s" className="bg-ink py-3 text-paper">
+      <Row seconds={38} className="bg-ink py-3 text-paper">
         {headline}
       </Row>
-      <Row duration="55s" reverse className="border-t border-rule py-2.5">
+      <Row seconds={55} reverse className="border-t border-rule py-2.5">
         {runner}
       </Row>
     </section>

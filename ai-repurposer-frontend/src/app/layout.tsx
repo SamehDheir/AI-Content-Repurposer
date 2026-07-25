@@ -25,6 +25,10 @@ const displaySerif = Newsreader({
 });
 
 export const metadata: Metadata = {
+  // Social images have to be absolute URLs. Without this Next resolves them
+  // against http://localhost:3000 and every shared link points at nothing —
+  // set NEXT_PUBLIC_SITE_URL to the deployed origin.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: "AI Repurposer — One video, cut into everything you publish",
   description:
     "Paste a YouTube link. Get back a Twitter thread, a blog post, a Facebook post and a highlight reel — transcribed, written and laid out in Arabic or English.",

@@ -288,9 +288,9 @@ export default function LoginPage() {
         </main>
 
         <footer className="border-t border-rule px-5 py-4 sm:px-8">
-          <span className="label text-ink-3">
+          <p className="text-[12.5px] leading-[1.6] text-ink-3">
             Sessions are HttpOnly cookies — nothing is kept in the browser you can read.
-          </span>
+          </p>
         </footer>
       </div>
 

@@ -80,7 +80,9 @@ export function AuthShell({
       </main>
 
       <footer className="border-t border-rule px-5 py-4 sm:px-8">
-        <span className="label text-ink-3">{note}</span>
+        {/* Sentence, so sentence case — `.label` is for two-to-four word slugs;
+            at 11px caps with tracking a full line of prose stops being read. */}
+        <p className="text-[12.5px] leading-[1.6] text-ink-3">{note}</p>
       </footer>
     </div>
   );

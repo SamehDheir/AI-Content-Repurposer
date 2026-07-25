@@ -25,7 +25,11 @@ export function TwitterContent({ body }: { body: string }) {
             </span>
 
             <div className="min-w-0 flex-1">
-              <p className="whitespace-pre-wrap text-[14.5px] leading-[1.7] text-ink">{text}</p>
+              {/* Per-post rather than inherited: one English post inside an
+                  Arabic thread should still resolve on its own. */}
+              <p dir="auto" className="whitespace-pre-wrap text-[14.5px] leading-[1.7] text-ink">
+                {text}
+              </p>
               <div className="mt-2.5 flex items-center gap-3">
                 <span
                   className={`label tabular-nums ${

@@ -62,7 +62,7 @@ function Panel({
 
 export function Outputs() {
   return (
-    <section id="outputs" className="border-b border-rule py-20 sm:py-28">
+    <section id="outputs" className="scroll-mt-20 border-b border-rule py-20 sm:py-28">
       <div className="mx-auto max-w-340 px-5 sm:px-8">
         <SectionHead
           index="01"

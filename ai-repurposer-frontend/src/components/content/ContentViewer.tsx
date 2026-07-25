@@ -26,12 +26,20 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
   const [plateError, setPlateError] = useState("");
   const [zoomed, setZoomed] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(job.imageUrl ?? null);
+  const [plateLoaded, setPlateLoaded] = useState(false);
 
   const bodyOf = (t: ContentType) =>
     edited[t] ?? job.generatedContent.find((c) => c.type === t)?.body ?? "";
 
   const body = bodyOf(tab);
   const active = TABS.find((t) => t.key === tab)!;
+
+  // Arabic is the default output language, so the sheet — not the chrome around
+  // it — has to run right-to-left. Mirroring the sheet also flips the numbering
+  // columns and rules to the correct side, which `text-align` alone would not.
+  const arabic = job.language === "Arabic";
+  const dir = arabic ? "rtl" : "ltr";
+  const lang = arabic ? "ar" : "en";
 
   // Escape closes, and the page behind must not scroll while the sheet is up.
   useEffect(() => {
@@ -60,6 +68,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
     setPlateError("");
     try {
       const { imageUrl: url } = await api.generateImageForJob(job.id);
+      setPlateLoaded(false);
       setImageUrl(url);
       onJobUpdate?.({ ...job, imageUrl: url });
     } catch (err) {
@@ -114,7 +123,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                 disabled={!has}
                 aria-pressed={on}
                 className={`group relative flex flex-1 flex-col items-center justify-center gap-3 border-b border-rule transition-colors last:border-b-0 ${
-                  on ? "text-paper" : has ? "text-ink-3 hover:text-ink" : "text-ink-3/40"
+                  on ? "text-paper" : has ? "text-ink-3 hover:text-ink" : "cursor-not-allowed text-ink-3 opacity-70"
                 }`}
                 style={{ background: on ? t.ink : undefined }}
               >
@@ -163,7 +172,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                   onClick={() => setTab(t.key)}
                   disabled={!has}
                   className={`label flex-1 border-r border-rule py-3 last:border-r-0 ${
-                    on ? "text-paper" : has ? "text-ink-3" : "text-ink-3/40"
+                    on ? "text-paper" : has ? "text-ink-3" : "cursor-not-allowed text-ink-3 opacity-70"
                   }`}
                   style={{ background: on ? t.ink : undefined }}
                 >
@@ -183,11 +192,38 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
                 }`}
                 aria-label={zoomed ? "Shrink the plate" : "Enlarge the plate"}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imageUrl} alt="Generated featured image" className="h-full w-full object-cover" />
+                {/* The URL comes back before the image exists — pollinations
+                    renders on first request, which can take 5–15s. Without its
+                    own load state this is just an empty box for that whole
+                    time, and the API spinner has already stopped. */}
+                <span className="relative block h-full w-full">
+                  {!plateLoaded && (
+                    <span className="hatch absolute inset-0 flex items-center justify-center bg-surface-2">
+                      <span
+                        className="h-3 w-3 border border-signal"
+                        style={{ animation: "cr-spin 0.9s linear infinite" }}
+                      />
+                    </span>
+                  )}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl}
+                    alt="Generated featured image"
+                    onLoad={() => setPlateLoaded(true)}
+                    onError={() => {
+                      setPlateLoaded(true);
+                      setPlateError("The plate did not render. Try generating it again.");
+                    }}
+                    className={`h-full w-full object-cover transition-opacity duration-500 ${
+                      plateLoaded ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                </span>
               </button>
               <div className="min-w-0">
-                <span className="label text-ink-3">Plate 01 · featured image</span>
+                <span className="label text-ink-3">
+                  Plate 01 · {plateLoaded ? "featured image" : "rendering…"}
+                </span>
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={download}
@@ -207,7 +243,11 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
           )}
 
           {/* ── Sheet ── */}
-          <div className="sheet min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8">
+          <div
+            dir={dir}
+            lang={lang}
+            className="sheet min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8"
+          >
             {!body ? (
               <p className="label py-16 text-center text-ink-3">Nothing was cut for this format.</p>
             ) : (

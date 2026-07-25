@@ -30,7 +30,11 @@ export function Hero({ authed, onEnter }: { authed: boolean; onEnter: (url?: str
 
   return (
     <section className="relative border-b border-rule pt-28 sm:pt-32" aria-labelledby="masthead">
-      <div className="pointer-events-none absolute inset-0 gridlines opacity-40" aria-hidden="true" />
+      {/* Four hairlines across a phone-width column is noise, not structure. */}
+      <div
+        className="gridlines pointer-events-none absolute inset-0 hidden opacity-40 sm:block"
+        aria-hidden="true"
+      />
 
       <div className="relative mx-auto grid max-w-340 grid-cols-1 gap-x-10 gap-y-14 px-5 pb-16 sm:px-8 lg:grid-cols-12 lg:pb-20">
         {/* ── Masthead copy ── */}
