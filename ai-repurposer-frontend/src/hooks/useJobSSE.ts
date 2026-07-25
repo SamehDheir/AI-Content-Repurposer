@@ -1,9 +1,8 @@
 'use client';
 import { useEffect, useRef } from 'react';
 import { type Job } from '@/src/lib/api';
-import { ACCESS_TOKEN, getCookie } from '@/src/lib/cookies';
 
-const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000';
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 export function useJobSSE(
   jobId: string | null,
@@ -17,12 +16,11 @@ export function useJobSSE(
   useEffect(() => {
     if (!jobId) return;
 
-    const token = getCookie(ACCESS_TOKEN);
-    if (!token) return;
-
-    const es = new EventSource(
-      `${BASE}/jobs/${jobId}/status?token=${encodeURIComponent(token)}`,
-    );
+    // withCredentials sends the HttpOnly auth cookie; the token is no longer
+    // passed in the query string.
+    const es = new EventSource(`${BASE}/jobs/${jobId}/status`, {
+      withCredentials: true,
+    });
 
     es.onmessage = (e) => {
       const job: Job = JSON.parse(e.data);

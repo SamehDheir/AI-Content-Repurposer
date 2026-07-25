@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/src/lib/api";
-import { Sparkles, AlertCircle, ArrowRight } from "lucide-react";
+import { Sparkles, AlertCircle, ArrowRight, CheckCircle } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
+  const [notice, setNotice]     = useState("");
   const [loading, setLoading]   = useState(false);
   const [isRegister, setIsRegister] = useState(false);
 
@@ -16,15 +17,19 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setNotice("");
     try {
-      const fn = isRegister ? api.register : api.login;
-      const { accessToken, refreshToken } = await fn(email, password);
-      
-      // Set cookies with httpOnly (not possible from client, so use regular cookies)
-      document.cookie = `accessToken=${accessToken}; path=/; max-age=604800`; // 7 days
-      document.cookie = `refreshToken=${refreshToken}; path=/; max-age=604800`;
-      
-      router.push("/dashboard");
+      if (isRegister) {
+        // Registration no longer starts a session — the address must be
+        // verified first, so show the confirmation instead of redirecting.
+        const { message } = await api.register(email, password);
+        setNotice(message);
+        setPassword("");
+      } else {
+        // The server sets HttpOnly cookies on the response; nothing to store.
+        await api.login(email, password);
+        router.push("/dashboard");
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -32,8 +37,18 @@ export default function LoginPage() {
     }
   };
 
+  const handleResend = async () => {
+    setError("");
+    try {
+      const { message } = await api.resendVerification(email);
+      setNotice(message);
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
   const handleGoogleLogin = () => {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
     window.location.href = `${backendUrl}/auth/google`;
   };
 
@@ -92,9 +107,27 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                <AlertCircle size={13} className="text-red-400 shrink-0" />
-                <p className="text-xs text-red-400">{error}</p>
+              <div className="flex flex-col gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+                <div className="flex items-center gap-2">
+                  <AlertCircle size={13} className="text-red-400 shrink-0" />
+                  <p className="text-xs text-red-400">{error}</p>
+                </div>
+                {error.toLowerCase().includes("verify your email") && (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 underline self-start"
+                  >
+                    Resend verification email
+                  </button>
+                )}
+              </div>
+            )}
+
+            {notice && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <CheckCircle size={13} className="text-emerald-400 shrink-0" />
+                <p className="text-xs text-emerald-400">{notice}</p>
               </div>
             )}
 

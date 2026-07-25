@@ -56,7 +56,7 @@ Phase 1, so all three were wrapped.
 
 ---
 
-## Phase 2 — Auth and security ⬜
+## Phase 2 — Auth and security ✅
 
 The token model is the weak point, and most of it is one coherent migration rather than
 several independent fixes.
@@ -68,29 +68,47 @@ becomes full account takeover. The access and refresh tokens also share an ident
 lifetime, which makes refresh pointless, and the frontend never calls `/auth/refresh` at
 all — there is no 401 handler in `api.ts`.
 
-- [ ] Backend sets `HttpOnly; Secure; SameSite=Lax` cookies via `res.cookie()` on login, register, and the Google callback. Add `cookie-parser`; `JwtStrategy` extracts from the cookie instead of the bearer header.
-- [ ] Access token drops to ~15 minutes; refresh stays 7 days.
-- [ ] Frontend deletes all `document.cookie` writes (login page, `auth/callback/page.tsx`, dashboard logout) and switches `fetch` to `credentials: 'include'`.
-- [ ] `request()` in `api.ts` gains a 401 → `POST /auth/refresh` → retry-once interceptor.
-- [ ] OAuth callback stops passing tokens in the URL query string (they land in browser history and referrer headers); set cookies server-side before redirecting.
+- [x] Backend sets `HttpOnly; SameSite=Lax` cookies via `res.cookie()` on login, refresh and the Google callback, and clears them on logout. `cookie-parser` added; both JWT strategies extract from cookies. The bearer header is **no longer accepted**.
+- [x] Access token dropped to 15 minutes; refresh stays 7 days.
+- [x] Frontend `document.cookie` writes all removed; `fetch` uses `credentials: 'include'`. `src/lib/cookies.ts` deleted — HttpOnly cookies are unreadable from JS.
+- [x] `request()` in `api.ts` retries once through `POST /auth/refresh` on a 401, sharing a single in-flight refresh so parallel 401s rotate the token once.
+- [x] OAuth callback sets cookies server-side and redirects to a bare `/auth/callback`; no tokens in the query string.
+- [x] Registration no longer returns a session, since verification is now enforced.
 
-`proxy.ts` keeps working unchanged — it reads cookies server-side.
+`proxy.ts` was **not** unchanged as originally assumed: it gated on the access cookie, which now expires every 15 minutes and would have bounced active users to the login page. It now gates on the refresh cookie.
 
 ### Smaller items
 
-- [ ] **SSE token in query string.** `?token=` gets written to access and proxy logs. Once cookies are `HttpOnly`, `EventSource` sends them automatically with `withCredentials: true`; drop the param and guard the route normally. *(This also removes the last consumer of `getCookie`.)*
-- [ ] **`emailVerified` is never enforced.** Unverified users log in freely. Either check it in `validateUser` or remove the feature — a half-wired one is worse than neither.
-- [ ] **Verification token never expires** despite the email promising 24 hours. Add an expiry column mirroring `passwordResetExpires`.
-- [ ] **CORS placeholder.** `'https://your-domain.com'` in `main.ts` — replace with an env-driven origin list.
+- [x] **SSE token in query string** removed; the route uses the standard cookie guard and `EventSource` sends credentials.
+- [x] **`emailVerified` enforced** in `validateUser` (403). Existing accounts were grandfathered to verified by migration `20260723120000`. `POST /auth/resend-verification` added so an expired token is not a dead end.
+- [x] **Verification tokens now expire** after 24h via `emailVerificationExpires`.
+- [x] **CORS** driven by `CORS_ORIGINS`; the `https://your-domain.com` placeholder is gone.
+
+### Found during review of this phase
+
+Two defects in the new code, both caught before commit:
+
+- **Google sign-in did not verify a linked account.** Signing in with Google against an address that had registered by password linked the `googleId` but left `emailVerified` false, so password login kept failing with 403. Completing Google's flow proves control of the address, so it now sets verified.
+- **Password reset stranded unverified accounts.** An unverified user could reset their password and still be refused at login, with no way out. Receiving the reset link proves address control, so a successful reset now also verifies. Confirmed: login goes 403 → 200 across a reset.
+
+### Verification performed
+
+22/22 automated checks, covering: registration issues no session and leaks no token, unverified login is refused, verification token carries an expiry and cannot be replayed, login sets `HttpOnly` `SameSite=Lax` cookies with no token in the body, cookie auth succeeds while the bearer header is refused, token lifetimes are exactly 15m/7d (decoded from the JWTs), refresh rotates from the cookie, SSE refuses an unauthenticated stream, and logout expires the cookies server-side. The interceptor path (401 → refresh → replay) and a live cookie-authenticated SSE stream were exercised separately.
+
+### Deployment caveat
+
+`proxy.ts` reads the backend's cookies because both apps are on `localhost` and **cookies ignore port**. Split the apps across domains and the Next server stops seeing them, so route gating breaks and `COOKIE_SAMESITE=none` becomes mandatory — which requires HTTPS and forfeits the CSRF protection `Lax` gives for free. A cross-domain deployment needs CSRF tokens and a different gating strategy.
 
 ---
 
 ## Phase 3 — Deploy readiness ⬜
 
+- [ ] **🔴 Migration history does not describe the schema.** Root cause: `.gitignore` contained `/prisma/migrations`, so **no migration was ever committed** — `20260420140011_init` existed only on one machine and the schema was evolved with `db push`. It never created the `User` table, the `Plan` enum, `Job.userId` or `Job.imageUrl`. Consequences: a fresh `migrate deploy` yields a schema the app cannot run against, and `migrate dev` demands a full database reset because it detects the drift. The ignore rule was removed in Phase 2 and both migrations committed; what remains is to generate a baseline migration reconciling `init` with the live schema, mark it applied with `prisma migrate resolve --applied`, and verify a from-scratch `migrate deploy` boots. **Until then, hand-write migration SQL and apply with `migrate deploy` only.** *(Discovered during Phase 2.)*
+- [ ] **🔴 The dev database is not the one in `docker-compose.yml`.** Compose starts `postgres:15` holding `ai_repurposer`, but `DATABASE_URL` targets `ai_content_repurposer_db` on a **native Windows PostgreSQL 18** that also binds `localhost:5432` and wins the loopback. The container is dead weight and `docker exec … psql` inspects the wrong server. Decide which one is authoritative and align compose, `.env` and the docs. *(Discovered during Phase 2.)*
 - [ ] **`Prisma.module.ts` capital `P`**, imported with *both* casings. Works on Windows, breaks the moment CI or Docker builds on Linux. `git mv` to `prisma.module.ts`.
 - [ ] **`npm run start:prod` is broken.** `prisma.config.ts` at the project root widens tsc's `rootDir`, so output lands at `dist/src/main.js`, not `dist/main.js`. Either exclude it from `tsconfig.build.json` or fix the script path.
-- [ ] **Port hardcoded** to `3000` in `main.ts` → `process.env.PORT ?? 3000`.
-- [ ] **Frontend port collision.** `next dev` defaults to 3000, where the backend lives. Bake it in: `"dev": "next dev -p 3001"`, `"start": "next start -p 3001"`.
+- [x] **Port hardcoded** — now `process.env.PORT ?? 3001`.
+- [x] **Port collision resolved** by moving the *backend* to 3001 and leaving the frontend on Next's default 3000. `CORS_ORIGINS`, `FRONTEND_URL`, `GOOGLE_CALLBACK_URL` and `NEXT_PUBLIC_API_URL` were all realigned; see the table in [CLAUDE.md](CLAUDE.md).
 - [ ] **No `.env.example`** in either app. The backend `.env` also has duplicate `REDIS_PORT` and `GOOGLE_*` keys — dedupe.
 - [ ] **`yt-dlp` is an undeclared system dependency.** Document it and fail fast at boot with a clear message, rather than at attempt 3 of a job.
 - [ ] **No Dockerfile**; compose has only Postgres + Redis. Add Dockerfiles and app services. The backend image needs Python and `yt-dlp`.
@@ -160,8 +178,9 @@ first:
 - [ ] `UsageService.tryConsume` / `release` — this protects revenue and had a known race. Test the concurrent case explicitly, plus TTL assignment and the fail-closed path when Redis is unavailable.
 - [ ] `extractVideoId` — table-test it once deduplicated (Phase 4).
 - [ ] `JobsProcessor.process` with mocked services — cover the idempotency guards (already `COMPLETED`, missing row) and the failure path.
-- [ ] `AuthService` refresh and password-reset token flows.
+- [ ] `AuthService` refresh and password-reset token flows, including that a reset and a Google link both mark the address verified.
 - [ ] `JobsService.initiateJob` — quota rollback when enqueue fails.
+- [ ] Cookie attributes (`HttpOnly`, `SameSite`, `Secure` under each env combination) and the `api.ts` refresh interceptor's single-flight behaviour under parallel 401s.
 
 ---
 

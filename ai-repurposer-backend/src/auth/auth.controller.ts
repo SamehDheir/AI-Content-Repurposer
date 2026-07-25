@@ -16,6 +16,8 @@ import { LoginDto } from './dto/login.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { clearAuthCookies, setAuthCookies } from './cookies';
 import type { Request, Response } from 'express';
 
 @Controller('auth')
@@ -25,6 +27,7 @@ export class AuthController {
   @Post('register')
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 registrations per minute
   register(@Body() body: RegisterDto) {
+    // Returns a message, not a session — the address must be verified first.
     return this.authService.register(body.email, body.password, body.name);
   }
 
@@ -32,27 +35,46 @@ export class AuthController {
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 login attempts per minute
   @HttpCode(200)
   @UseGuards(AuthGuard('local'))
-  login(@Body() _body: LoginDto, @Req() req: Request) {
+  async login(
+    @Body() _body: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const user = req.user as { id: string; email: string };
-    return this.authService.login(user.id, user.email);
+    const tokens = await this.authService.login(user.id, user.email);
+    setAuthCookies(res, tokens);
+    return { id: user.id, email: user.email };
   }
 
   @Post('refresh')
   @UseGuards(AuthGuard('jwt-refresh'))
-  refresh(@Req() req: Request) {
+  @HttpCode(200)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const user = req.user as {
       sub: string;
       email: string;
       refreshToken: string;
     };
-    return this.authService.refresh(user.sub, user.email, user.refreshToken);
+    const tokens = await this.authService.refresh(
+      user.sub,
+      user.email,
+      user.refreshToken,
+    );
+    setAuthCookies(res, tokens);
+    return { id: user.sub, email: user.email };
   }
 
   @Post('logout')
+  @HttpCode(200)
   @UseGuards(AuthGuard('jwt'))
-  logout(@Req() req: Request) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const user = req.user as { id: string };
-    return this.authService.logout(user.id);
+    const result = await this.authService.logout(user.id);
+    clearAuthCookies(res);
+    return result;
   }
 
   // ── Google OAuth ──────────────────────────────────────
@@ -71,16 +93,24 @@ export class AuthController {
 
     const tokens = await this.authService.googleLogin(googleId, email, name);
 
-    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3001';
-    res.redirect(
-      `${frontendUrl}/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`,
-    );
+    // Cookies are set server-side rather than passed as query parameters,
+    // which would leak the tokens into browser history and Referer headers.
+    setAuthCookies(res, tokens);
+
+    const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3000';
+    res.redirect(`${frontendUrl}/auth/callback`);
   }
 
   // ── Email Verification ────────────────────────────────
   @Post('verify-email')
   async verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body.token);
+  }
+
+  @Post('resend-verification')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute
+  async resendVerification(@Body() body: ResendVerificationDto) {
+    return this.authService.resendVerification(body.email);
   }
 
   // ── Password Reset ────────────────────────────────────

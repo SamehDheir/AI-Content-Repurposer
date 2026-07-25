@@ -8,14 +8,11 @@ import {
   Req,
   Sse,
   MessageEvent,
-  Query,
-  UnauthorizedException,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
-import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { Observable, interval } from 'rxjs';
 import { switchMap, takeWhile, map } from 'rxjs/operators';
@@ -28,7 +25,6 @@ import { ImageService } from 'src/image/image.service';
 export class JobsController {
   constructor(
     private readonly jobsService: JobsService,
-    private readonly jwt: JwtService,
     private readonly imageService: ImageService,
   ) {}
 
@@ -56,22 +52,15 @@ export class JobsController {
     return job;
   }
 
+  // Authenticated by the standard cookie guard. The token used to be passed as
+  // a ?token= query parameter, which leaked it into access and proxy logs.
   @Sse(':id/status')
+  @UseGuards(AuthGuard('jwt'))
   streamJobStatus(
     @Param('id') id: string,
-    @Query('token') token: string,
+    @Req() req: Request,
   ): Observable<MessageEvent> {
-    if (!token) throw new UnauthorizedException('Token required');
-
-    let userId: string;
-    try {
-      const payload = this.jwt.verify(token, {
-        secret: process.env.JWT_SECRET,
-      });
-      userId = payload.sub;
-    } catch {
-      throw new UnauthorizedException('Invalid token');
-    }
+    const { id: userId } = req.user as { id: string };
 
     return interval(2000).pipe(
       switchMap(() => this.jobsService.getJob(id, userId)),
