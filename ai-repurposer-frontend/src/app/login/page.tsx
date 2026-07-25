@@ -6,6 +6,7 @@ import { api } from "@/src/lib/api";
 import { Mark, Wordmark } from "@/src/components/brand/Mark";
 import { ThemeToggle } from "@/src/components/ui/ThemeToggle";
 import { Waveform } from "@/src/components/ui/Waveform";
+import { Field } from "@/src/components/auth/Field";
 
 const MODES = ["Sign in", "New account"] as const;
 type Mode = (typeof MODES)[number];
@@ -16,49 +17,6 @@ const FORMATS = [
   ["Facebook post", "var(--fmt-social)"],
   ["Highlight reel", "var(--fmt-marks)"],
 ];
-
-/** Mono-labelled rule field, the same one the slate on the desk uses. */
-function Field({
-  id,
-  label,
-  type,
-  value,
-  onChange,
-  placeholder,
-  hint,
-  autoComplete,
-  required = true,
-}: {
-  id: string;
-  label: string;
-  type: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  hint?: string;
-  autoComplete?: string;
-  required?: boolean;
-}) {
-  return (
-    <div>
-      <label htmlFor={id} className="label mb-2 block text-ink-3">
-        {label}
-      </label>
-      <input
-        id={id}
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        autoComplete={autoComplete}
-        spellCheck={false}
-        className="slug h-11 w-full border-b border-rule-strong bg-transparent text-[14px] text-ink outline-none transition-colors placeholder:text-ink-3 focus:border-signal"
-      />
-      {hint && <p className="label mt-2 text-ink-3">{hint}</p>}
-    </div>
-  );
-}
 
 export default function LoginPage() {
   const router = useRouter();

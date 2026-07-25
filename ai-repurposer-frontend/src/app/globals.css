@@ -336,6 +336,23 @@ body::after {
   }
 }
 
+/* A rubber stamp coming down on a docket — the terminal state of the auth
+   flows, in place of the usual green tick in a circle. */
+@keyframes cr-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.7) rotate(-9deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-3deg);
+  }
+}
+
 @keyframes cr-blade {
   0%,
   100% {
