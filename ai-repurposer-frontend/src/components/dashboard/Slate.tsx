@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { api } from "@/src/lib/api";
-import { youtubeId } from "@/src/lib/youtube";
-import { PENDING_URL_KEY } from "@/src/components/home/PasteField";
+import { api } from "@/lib/api";
+import { youtubeId } from "@/lib/youtube";
+import { PENDING_URL_KEY } from "@/components/home/PasteField";
 
 const LANGUAGES = ["Arabic", "English"] as const;
 type Language = (typeof LANGUAGES)[number];

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Known defects and the planned remediation order live in [ROADMAP.md](ROADMAP.md). Check it before starting structural work — Phase 4 moves most of the backend, so large refactors landed early will conflict.
+Known defects and the planned remediation order live in [ROADMAP.md](ROADMAP.md). Phases 1–4 are done; Phase 5 (tests) is the remaining work.
 
 ## Repository layout
 
@@ -10,6 +10,23 @@ Two independent npm projects in one git repo — there is no workspace/monorepo 
 
 - `ai-repurposer-backend/` — NestJS 11 API on port **3001** (`process.env.PORT ?? 3001`)
 - `ai-repurposer-frontend/` — Next.js 16 App Router + React 19 + Tailwind 4 on port **3000** (Next's default)
+
+Source layout (Phase 4). Every feature folder owns a `*.module.ts`; nothing is
+provided by a module that does not own it:
+
+```
+backend  src/{main,app.module}.ts
+         src/common/     config/ (plans.config.ts), utils/ (youtube.util.ts)
+         src/infra/      prisma/, redis/
+         src/modules/    auth/ users/ jobs/ ai/ transcription/ image/ email/ usage/
+
+frontend src/app/        routes only
+         src/components/ ui/ (shared primitives), content/ (per ContentType)
+         src/features/   jobs/ (useJobs, useJobSSE, JobCard)
+         src/lib/api/    client.ts, endpoints.ts, types.ts, index.ts
+         src/contexts/   ThemeContext.tsx
+         src/proxy.ts    must stay here — Next resolves the proxy by convention
+```
 
 ## Commands
 
@@ -87,28 +104,28 @@ Note also that `rm -rf .next` or a `next build` while `next dev` is running leav
 
 The core flow is asynchronous and spans both processes:
 
-1. `POST /jobs` ([jobs.controller.ts](ai-repurposer-backend/src/jobs/jobs.controller.ts)) → `JobsService.initiateJob` atomically claims a monthly quota slot, creates a `Job` row (`QUEUED`), and enqueues `process-video` on the BullMQ `repurpose-queue` (3 attempts, exponential backoff). If anything after the claim fails, the slot is released and the orphaned row deleted.
-2. `JobsProcessor` ([jobs.processor.ts](ai-repurposer-backend/src/jobs/jobs.processor.ts)) — the single worker — runs: transcript (up to 3 attempts) → all four `ContentType`s generated **in parallel** via `Promise.all` → one Prisma `$transaction` that deletes prior content, inserts the new rows, and flips the job to `COMPLETED`. It is idempotent: it skips jobs already `COMPLETED` or missing from the DB.
+1. `POST /jobs` ([jobs.controller.ts](ai-repurposer-backend/src/modules/jobs/jobs.controller.ts)) → `JobsService.initiateJob` atomically claims a monthly quota slot, creates a `Job` row (`QUEUED`), and enqueues `process-video` on the BullMQ `repurpose-queue` (3 attempts, exponential backoff). If anything after the claim fails, the slot is released and the orphaned row deleted.
+2. `JobsProcessor` ([jobs.processor.ts](ai-repurposer-backend/src/modules/jobs/jobs.processor.ts)) — the single worker — runs: transcript (up to 3 attempts) → all four `ContentType`s generated **in parallel** via `Promise.all` → one Prisma `$transaction` that deletes prior content, inserts the new rows, and flips the job to `COMPLETED`. It is idempotent: it skips jobs already `COMPLETED` or missing from the DB.
 3. The frontend watches progress over **SSE**: `GET /jobs/:id/status` (authenticated by the same cookie guard as every other route) polls the DB every 2s via `rxjs interval` and completes on `COMPLETED`/`FAILED`.
 
 Because the worker runs in the same Nest process as the API, there is no separate worker entrypoint — starting the backend starts both.
 
 ### External services
 
-- **Transcription** ([transcription.service.ts](ai-repurposer-backend/src/transcription/transcription.service.ts)): tries YouTube captions via `youtubei.js` first; falls back to downloading audio with `yt-dlp` into the OS temp dir and sending it to **Groq Whisper** (`whisper-large-v3-turbo`, 24 MB cap). The temp file is deliberately kept between retry attempts and cleaned up by the processor via `cleanupAudioFile`.
-- **Text generation** ([ai.service.ts](ai-repurposer-backend/src/ai/ai.service.ts)): OpenAI SDK pointed at **OpenRouter** (`meta-llama/llama-3.1-8b-instruct`). Per-content-type prompts live in the `PROMPTS` map; the system prompt carries the target language (`Arabic` default, Modern Standard Arabic).
-- **Images** ([image.service.ts](ai-repurposer-backend/src/image/image.service.ts)): OpenRouter writes a Flux-style prompt, which is embedded in a **pollinations.ai** URL and then shortened through TinyURL. No image bytes are stored — only the URL on `Job.imageUrl`.
+- **Transcription** ([transcription.service.ts](ai-repurposer-backend/src/modules/transcription/transcription.service.ts)): tries YouTube captions via `youtubei.js` first; falls back to downloading audio with `yt-dlp` into the OS temp dir and sending it to **Groq Whisper** (`whisper-large-v3-turbo`, 24 MB cap). The temp file is deliberately kept between retry attempts and cleaned up by the processor via `cleanupAudioFile`.
+- **Text generation** ([ai.service.ts](ai-repurposer-backend/src/modules/ai/ai.service.ts)): OpenAI SDK pointed at **OpenRouter** (`meta-llama/llama-3.1-8b-instruct`). Per-content-type prompts live in the `PROMPTS` map; the system prompt carries the target language (`Arabic` default, Modern Standard Arabic).
+- **Images** ([image.service.ts](ai-repurposer-backend/src/modules/image/image.service.ts)): OpenRouter writes a Flux-style prompt, which is embedded in a **pollinations.ai** URL and then shortened through TinyURL. No image bytes are stored — only the URL on `Job.imageUrl`.
 
 ### Auth
 
 JWT via Passport with four strategies (`local`, `jwt`, `jwt-refresh`, `google`). Access tokens live **15 minutes**, refresh tokens **7 days**, under different secrets (`JWT_SECRET` / `JWT_REFRESH_SECRET`); the refresh token is stored bcrypt-hashed on `User.refreshToken`.
 
-**Tokens are HttpOnly cookies and are never visible to JavaScript.** They are set server-side by [cookies.ts](ai-repurposer-backend/src/auth/cookies.ts) on login, refresh and the Google callback, and cleared on logout. Consequences worth internalising before touching this code:
+**Tokens are HttpOnly cookies and are never visible to JavaScript.** They are set server-side by [cookies.ts](ai-repurposer-backend/src/modules/auth/cookies.ts) on login, refresh and the Google callback, and cleared on logout. Consequences worth internalising before touching this code:
 
 - **No response body ever contains a token**, and no client code may set one. `document.cookie` must not reappear anywhere in the frontend.
 - **The bearer header is not accepted.** `JwtStrategy` reads the `accessToken` cookie only, so `curl` needs a cookie jar (`-c`/`-b`), not `Authorization`.
-- Every frontend request sends `credentials: 'include'` ([api.ts](ai-repurposer-frontend/src/lib/api.ts)). Because credentialed CORS forbids a wildcard origin, `CORS_ORIGINS` must list the frontend origin exactly.
-- `api.ts` retries once through `POST /auth/refresh` on a 401, sharing a single in-flight refresh so a burst of parallel 401s rotates the token once. `/auth/login`, `/auth/register` and `/auth/refresh` are excluded to avoid a loop.
+- Every frontend request sends `credentials: 'include'` ([api.ts](ai-repurposer-frontend/src/lib/api/client.ts)). Because credentialed CORS forbids a wildcard origin, `CORS_ORIGINS` must list the frontend origin exactly.
+- `client.ts` retries once through `POST /auth/refresh` on a 401, sharing a single in-flight refresh so a burst of parallel 401s rotates the token once. `/auth/login`, `/auth/register` and `/auth/refresh` are excluded to avoid a loop.
 - [proxy.ts](ai-repurposer-frontend/src/proxy.ts) gates `/dashboard` and `/login` on the **refresh** cookie, not the access cookie — the latter expires every 15 minutes and would bounce active users to the login page.
 - Cookie attributes come from env: `COOKIE_SAMESITE` (default `lax`), `COOKIE_SECURE` (default: on in production), `COOKIE_DOMAIN`. A cross-domain deployment needs `COOKIE_SAMESITE=none`, which forces `Secure`, requires HTTPS, and gives up the CSRF protection `Lax` provides for free — that setup would need CSRF tokens.
 
@@ -118,17 +135,21 @@ JWT via Passport with four strategies (`local`, `jwt`, `jwt-refresh`, `google`).
 
 Two independent mechanisms, easy to confuse:
 
-- **Plan quota** — Redis key `usage:{userId}:{YYYY-MM}` (see [plans.config.ts](ai-repurposer-backend/src/config/plans.config.ts)), expiring at the start of next month UTC. `FREE` = 1 job/month, `PRO` = `Infinity`. Claimed by `UsageService.tryConsume` from inside `JobsService`, reported by `GET /users/me`. The `User.jobsUsedThisMonth`/`usagePeriodStart` columns exist in the schema but are **not used** — Redis is the source of truth, so quota resets if Redis is flushed.
+- **Plan quota** — Redis key `usage:{userId}:{YYYY-MM}` (see [plans.config.ts](ai-repurposer-backend/src/common/config/plans.config.ts)), expiring at the start of next month UTC. `FREE` = 1 job/month, `PRO` = `Infinity`. Claimed by `UsageService.tryConsume` from inside `JobsService`, reported by `GET /users/me`. The `User.jobsUsedThisMonth`/`usagePeriodStart` columns exist in the schema but are **not used** — Redis is the source of truth, so quota resets if Redis is flushed.
 
   Enforcement deliberately lives in the service, **not** a guard: Nest runs guards before pipes, so a guard would burn a user's monthly slot on requests that the `ValidationPipe` is about to reject. `tryConsume` runs INCR, the TTL and the limit check in one Lua script so concurrent requests cannot both observe the pre-increment value, and it lets Redis errors propagate so the endpoint fails closed.
 - **Rate limiting** — `@nestjs/throttler`, global 10/min + 100/hr, with tighter `@Throttle` overrides on register (3/min), login (5/min), job creation (5/min), and image generation (5–10/min).
 
 ## Conventions and gotchas
 
-- Backend imports mix relative paths (`../prisma/prisma.service`) with root-absolute ones (`src/ai/ai.service`, resolved by `baseUrl: "./"`). There is no `@/` alias on the backend.
+- Both apps use a `@/*` alias. Backend: `@/*` → `src/*` (`@/infra/prisma/prisma.service`). Frontend: `@/*` → `./src/*` (`@/lib/api`). Neither app has bare relative imports across folder boundaries any more — only within a module (`./jobs.service`, `../cookies` from `strategies/`).
+  - The backend alias needs no runtime resolver: `nest build` rewrites aliased imports to relative `require`s in `dist/`. Jest does **not** read `paths`, so both jest configs carry a `moduleNameMapper`.
 - Backend filenames are all lowercase. `Prisma.module.ts` was renamed to `prisma.module.ts` because the mixed-casing imports only worked on Windows and broke on a case-sensitive filesystem — keep new files lowercase.
-- Frontend alias `@/*` maps to the **project root**, not `src/`, so imports read `@/src/lib/api`.
-- `main.ts` registers a global `ValidationPipe({ whitelist: true, transform: true })`, so every `@Body()` needs a DTO class to be validated — an inline object type silently skips validation entirely. DTOs live in `src/jobs/dto/` and `src/auth/dto/`. Note that `whitelist` strips undecorated properties, so a field without a decorator never reaches the handler.
+  - That rename was made on disk in Phase 3 but **did not reach git until Phase 4**: `core.ignorecase=true` on Windows meant git kept tracking `Prisma.module.ts`, so a checkout on Linux still produced the capitalised name and the build broke. If you rename only the case of a file, verify with `git ls-tree -r --name-only HEAD | grep -i <name>` — `git status` will look clean either way.
+- `main.ts` registers a global `ValidationPipe({ whitelist: true, transform: true })`, so every `@Body()` needs a DTO class to be validated — an inline object type silently skips validation entirely. DTOs live in `src/modules/jobs/dto/` and `src/modules/auth/dto/`. Note that `whitelist` strips undecorated properties, so a field without a decorator never reaches the handler.
+- Dark/light theming is **token-driven** — see the design system below. Phase 4 replaced the old `useTheme()` ternaries with Tailwind's `dark:` variant; the redesign then replaced the colours themselves with semantic tokens (`bg-paper`, `text-ink-2`, `border-rule`), which is what you should reach for now. `@custom-variant dark (&:where(.dark, .dark *))` is still in `globals.css` and still required: without it Tailwind 4 keys `dark:` to the OS `prefers-color-scheme` and ignores the in-app toggle.
+  - Reach for `useTheme()` only when the branch is not CSS at all. The theme toggle's own icons switch via `.only-dark` / `.only-light` instead, so they are correct on the first paint rather than after hydration.
+  - Tailwind scans source for **complete** class names, so never build one by concatenation — `border-b-${dark ? '[#141416]' : 'white'}` generates nothing. This bug shipped in `ContentViewer` until Phase 4.
 - Dashboard components (`JobCard`, `ContentViewer`, `UsageBanner`) are `React.lazy` + `Suspense` loaded; keep new heavy components on that path.
 
 ### The design system ("Cutting Room")
@@ -145,3 +166,4 @@ The marketing page, the dashboard and the auth pages share one system defined in
 - `layout.tsx` runs a pre-paint inline script that sets the theme class before React hydrates; without it the whole page flashes in the wrong theme.
 - Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer.
 - Adding a `ContentType` requires changes in four places: the Prisma enum, `CONTENT_TYPES` in the processor, `PROMPTS` in `ai.service.ts`, and the frontend `TABS`/content components.
+- `extractVideoId` lives in `src/common/utils/youtube.util.ts`. `JobsProcessor` and `TranscriptionService` both call it — do not re-inline a copy, which is how it drifted before.

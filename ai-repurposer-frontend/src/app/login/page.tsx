@@ -2,11 +2,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api } from "@/src/lib/api";
-import { Mark, Wordmark } from "@/src/components/brand/Mark";
-import { ThemeToggle } from "@/src/components/ui/ThemeToggle";
-import { Waveform } from "@/src/components/ui/Waveform";
-import { Field } from "@/src/components/auth/Field";
+import { api } from "@/lib/api";
+import { Mark, Wordmark } from "@/components/brand/Mark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Waveform } from "@/components/ui/Waveform";
+import { Field } from "@/components/auth/Field";
 
 const MODES = ["Sign in", "New account"] as const;
 type Mode = (typeof MODES)[number];

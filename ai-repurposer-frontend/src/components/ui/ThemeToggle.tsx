@@ -1,5 +1,5 @@
 "use client";
-import { useTheme } from "@/src/contexts/ThemeContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 /**
  * Paper ⇄ Ink. The icons are swapped by the class on <html> rather than by

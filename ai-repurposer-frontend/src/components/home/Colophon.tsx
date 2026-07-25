@@ -1,9 +1,9 @@
 "use client";
 import Link from "next/link";
-import { Mark } from "@/src/components/brand/Mark";
-import { Reveal } from "@/src/components/ui/Reveal";
+import { Mark } from "@/components/brand/Mark";
+import { Reveal } from "@/components/ui/Reveal";
 import { PasteField } from "./PasteField";
-import { Waveform } from "@/src/components/ui/Waveform";
+import { Waveform } from "@/components/ui/Waveform";
 
 export function Colophon({
   authed,

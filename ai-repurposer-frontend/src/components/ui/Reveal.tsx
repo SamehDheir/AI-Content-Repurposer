@@ -1,5 +1,5 @@
 "use client";
-import { useReveal } from "@/src/hooks/useReveal";
+import { useReveal } from "@/lib/hooks/useReveal";
 
 interface Props {
   children: React.ReactNode;

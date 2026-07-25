@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { type Job, type ContentType, api } from "@/src/lib/api";
+import { type Job, type ContentType, api } from "@/lib/api";
 import { TABS } from "./types";
 import { TwitterContent } from "./TwitterContent";
 import { BlogContent } from "./BlogContent";

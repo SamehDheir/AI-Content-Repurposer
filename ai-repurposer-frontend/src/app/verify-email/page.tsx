@@ -2,9 +2,9 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/src/lib/api";
-import { AuthShell, Stamp, Problem } from "@/src/components/auth/AuthShell";
-import { Waveform } from "@/src/components/ui/Waveform";
+import { api } from "@/lib/api";
+import { AuthShell, Stamp, Problem } from "@/components/auth/AuthShell";
+import { Waveform } from "@/components/ui/Waveform";
 
 // useSearchParams() opts the subtree out of prerendering, so it needs its own
 // Suspense boundary or `next build` fails on this route.

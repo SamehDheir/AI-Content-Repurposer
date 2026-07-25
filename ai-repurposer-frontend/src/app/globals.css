@@ -14,6 +14,12 @@
    (bg-paper, text-ink-2, border-rule …) instead of per-class ternaries.
    ========================================================================== */
 
+/* Kept from Phase 4: Tailwind 4 keys `dark:` to prefers-color-scheme, so the
+   variant is rebound to the class ThemeProvider toggles. The tokens above make
+   `dark:` unnecessary for colour, but it stays correct for the cases they do
+   not cover (a one-off shadow, a borrowed third-party class). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root,
 .dark {
   --paper: #0b0b0a;
@@ -93,6 +99,8 @@
 
 /* ── Base ───────────────────────────────────────────────────────────────── */
 
+/* Phase 4's --background/--foreground pair is gone: `body` is driven by --paper
+   and --ink now, and nothing referenced bg-background or text-foreground. */
 html {
   scroll-behavior: smooth;
 }

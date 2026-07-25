@@ -1,5 +1,5 @@
 "use client";
-import { Reveal } from "@/src/components/ui/Reveal";
+import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "./SectionHead";
 
 /* Specimen copy. Everything below is a worked example of one video —

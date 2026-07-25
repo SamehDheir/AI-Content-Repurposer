@@ -1,8 +1,8 @@
 "use client";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { AuthShell } from "@/src/components/auth/AuthShell";
-import { Waveform } from "@/src/components/ui/Waveform";
+import { AuthShell } from "@/components/auth/AuthShell";
+import { Waveform } from "@/components/ui/Waveform";
 
 // The backend sets HttpOnly cookies before redirecting here, so there are no
 // tokens in the URL to read — this page just forwards to the dashboard. It is

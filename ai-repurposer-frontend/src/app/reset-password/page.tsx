@@ -2,9 +2,9 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api } from "@/src/lib/api";
-import { AuthShell, Stamp, Problem, Action } from "@/src/components/auth/AuthShell";
-import { Field } from "@/src/components/auth/Field";
+import { api } from "@/lib/api";
+import { AuthShell, Stamp, Problem, Action } from "@/components/auth/AuthShell";
+import { Field } from "@/components/auth/Field";
 
 // useSearchParams() opts the subtree out of prerendering, so it needs its own
 // Suspense boundary or `next build` fails on this route.

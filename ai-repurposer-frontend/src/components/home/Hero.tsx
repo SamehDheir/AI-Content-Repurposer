@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Splitter } from "./Splitter";
 import { PasteField } from "./PasteField";
-import { useScramble } from "@/src/hooks/useScramble";
+import { useScramble } from "@/lib/hooks/useScramble";
 
 /** A headline line that rises out of its own mask, like type dropping into a chase. */
 function Line({ children, delay }: { children: React.ReactNode; delay: number }) {

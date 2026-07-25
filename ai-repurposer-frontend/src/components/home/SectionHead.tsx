@@ -1,5 +1,5 @@
 "use client";
-import { Reveal } from "@/src/components/ui/Reveal";
+import { Reveal } from "@/components/ui/Reveal";
 
 interface Props {
   index: string;

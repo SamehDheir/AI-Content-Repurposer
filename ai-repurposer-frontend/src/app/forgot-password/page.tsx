@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { api } from "@/src/lib/api";
-import { AuthShell, Stamp, Problem, Action } from "@/src/components/auth/AuthShell";
-import { Field } from "@/src/components/auth/Field";
+import { api } from "@/lib/api";
+import { AuthShell, Stamp, Problem, Action } from "@/components/auth/AuthShell";
+import { Field } from "@/components/auth/Field";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

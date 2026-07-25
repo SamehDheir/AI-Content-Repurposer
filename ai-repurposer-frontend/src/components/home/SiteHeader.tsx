@@ -2,9 +2,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mark, Wordmark } from "@/src/components/brand/Mark";
-import { ThemeToggle } from "@/src/components/ui/ThemeToggle";
-import { useScrollProgress } from "@/src/hooks/useScrollProgress";
+import { Mark, Wordmark } from "@/components/brand/Mark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { useScrollProgress } from "@/lib/hooks/useScrollProgress";
 
 const SECTIONS = [
   { id: "outputs", index: "01", label: "Outputs" },

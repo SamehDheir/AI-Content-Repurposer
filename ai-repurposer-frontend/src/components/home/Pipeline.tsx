@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Reveal } from "@/src/components/ui/Reveal";
+import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "./SectionHead";
 
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";

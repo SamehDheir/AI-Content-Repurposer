@@ -1,20 +1,20 @@
 "use client";
 import { useState, lazy, Suspense } from "react";
-import { useJobs } from "@/src/hooks/useJobs";
-import { api, type Job } from "@/src/lib/api";
-import { DeskRail, DeskHeader } from "@/src/components/dashboard/DeskChrome";
-import { Slate } from "@/src/components/dashboard/Slate";
-import { Waveform } from "@/src/components/ui/Waveform";
+import { useJobs } from "@/features/jobs/useJobs";
+import { api, type Job } from "@/lib/api";
+import { DeskRail, DeskHeader } from "@/components/dashboard/DeskChrome";
+import { Slate } from "@/components/dashboard/Slate";
+import { Waveform } from "@/components/ui/Waveform";
 
 // Heavy pieces stay off the first paint — see CLAUDE.md.
 const JobCard = lazy(() =>
-  import("@/src/components/JobCard").then((m) => ({ default: m.JobCard })),
+  import("@/features/jobs/JobCard").then((m) => ({ default: m.JobCard })),
 );
 const ContentViewer = lazy(() =>
-  import("@/src/components/content").then((m) => ({ default: m.ContentViewer })),
+  import("@/components/content").then((m) => ({ default: m.ContentViewer })),
 );
 const UsageBanner = lazy(() =>
-  import("@/src/components/UsageBanner").then((m) => ({ default: m.UsageBanner })),
+  import("@/components/ui/UsageBanner").then((m) => ({ default: m.UsageBanner })),
 );
 
 function RowSkeleton() {

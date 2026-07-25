@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { Mark, Wordmark } from "@/src/components/brand/Mark";
-import { ThemeToggle } from "@/src/components/ui/ThemeToggle";
+import { Mark, Wordmark } from "@/components/brand/Mark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 const INKS = ["var(--fmt-thread)", "var(--fmt-blog)", "var(--fmt-social)", "var(--fmt-marks)"];
 

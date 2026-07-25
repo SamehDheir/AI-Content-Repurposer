@@ -1,5 +1,5 @@
 "use client";
-import { Reveal } from "@/src/components/ui/Reveal";
+import { Reveal } from "@/components/ui/Reveal";
 import { SectionHead } from "./SectionHead";
 
 /* A colophon, not a feature grid: what is actually under the floorboards. */

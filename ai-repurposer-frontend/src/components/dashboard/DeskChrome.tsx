@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LogOut } from "lucide-react";
-import { Mark } from "@/src/components/brand/Mark";
-import { ThemeToggle } from "@/src/components/ui/ThemeToggle";
+import { Mark } from "@/components/brand/Mark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 /** Wall clock in the rail, in the same 24h form as the job timecodes. */
 function Timecode() {
