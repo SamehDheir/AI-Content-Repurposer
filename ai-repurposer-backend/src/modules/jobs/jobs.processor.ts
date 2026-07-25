@@ -37,11 +37,11 @@ export class JobsProcessor extends WorkerHost {
   ): Promise<void> {
     const { jobId, videoUrl, language = 'Arabic' } = job.data;
     const videoId = extractVideoId(videoUrl);
-    
+
     if (!videoId) {
       throw new Error('Invalid YouTube URL - could not extract video ID');
     }
-    
+
     this.logger.log(`Processing job ${jobId} for URL: ${videoUrl}`);
 
     try {
@@ -67,14 +67,21 @@ export class JobsProcessor extends WorkerHost {
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           if (attempt === 1) {
-            transcript = await this.transcriptionService.getTranscript(videoUrl);
+            transcript =
+              await this.transcriptionService.getTranscript(videoUrl);
           } else {
-            transcript = await this.transcriptionService.retryTranscription(videoUrl, videoId, attempt);
+            transcript = await this.transcriptionService.retryTranscription(
+              videoUrl,
+              videoId,
+              attempt,
+            );
           }
           this.logger.log(`Transcript length: ${transcript.length} chars`);
           break;
         } catch (error: any) {
-          this.logger.error(`Transcription attempt ${attempt} failed: ${error.message}`);
+          this.logger.error(
+            `Transcription attempt ${attempt} failed: ${error.message}`,
+          );
           if (attempt === 3) {
             throw error;
           }
@@ -110,10 +117,10 @@ export class JobsProcessor extends WorkerHost {
       this.logger.log(`✅ Job ${jobId} completed successfully (text saved)`);
     } catch (error: any) {
       this.logger.error(`Job ${jobId} failed: ${error.message}`, error.stack);
-      
+
       // Cleanup audio file on failure
       await this.transcriptionService.cleanupAudioFile(videoId);
-      
+
       await this.setJobStatus(jobId, 'FAILED').catch((e) =>
         this.logger.error(`Failed to update status: ${e.message}`),
       );
@@ -127,5 +134,4 @@ export class JobsProcessor extends WorkerHost {
       data: { status },
     });
   }
-
 }

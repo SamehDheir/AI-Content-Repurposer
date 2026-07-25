@@ -3,6 +3,6 @@ import { UsageService } from './usage.service';
 
 @Module({
   providers: [UsageService],
-  exports:   [UsageService],
+  exports: [UsageService],
 })
 export class UsageModule {}

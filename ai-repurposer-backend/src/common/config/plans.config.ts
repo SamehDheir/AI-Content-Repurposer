@@ -1,6 +1,6 @@
 export const PLAN_LIMITS: Record<string, number> = {
   FREE: 1,
-  PRO:  Infinity,
+  PRO: Infinity,
 };
 
 export function usageKey(userId: string): string {

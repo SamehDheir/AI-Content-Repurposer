@@ -8,11 +8,11 @@ export class ImageService {
 
   private readonly openrouter = new OpenAI({
     baseURL: 'https://openrouter.ai/api/v1',
-    apiKey:  process.env.OPENROUTER_API_KEY,
+    apiKey: process.env.OPENROUTER_API_KEY,
   });
 
   async generateImageFromContent(
-    content:     string,
+    content: string,
     contentType: string,
   ): Promise<string> {
     this.logger.log(`🧠 Building smart prompt for: ${contentType}`);
@@ -24,13 +24,13 @@ export class ImageService {
   }
 
   async generateImage(
-    prompt:   string,
+    prompt: string,
     options?: { width?: number; height?: number; seed?: number },
   ): Promise<string> {
     const {
-      width  = 1280,
+      width = 1280,
       height = 720,
-      seed   = Math.floor(Math.random() * 999999),
+      seed = Math.floor(Math.random() * 999999),
     } = options ?? {};
 
     const encoded = encodeURIComponent(prompt);
@@ -56,7 +56,9 @@ export class ImageService {
   }
 
   private async shortenUrl(longUrl: string): Promise<string> {
-    const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`);
+    const response = await fetch(
+      `https://tinyurl.com/api-create.php?url=${encodeURIComponent(longUrl)}`,
+    );
     if (!response.ok) {
       throw new Error(`TinyURL API failed: ${response.statusText}`);
     }
@@ -65,29 +67,34 @@ export class ImageService {
   }
 
   private async buildSmartPrompt(
-    content:     string,
+    content: string,
     contentType: string,
   ): Promise<string> {
     const styleGuide: Record<string, string> = {
-      TWITTER_THREAD: 'modern flat design, bold typography, electric blue and white palette, social media banner style, 16:9',
-      BLOG_POST:      'editorial photography style, cinematic lighting, professional, warm tones, magazine cover quality',
-      FACEBOOK_POST:  'vibrant lifestyle photography, warm inviting atmosphere, community feel, natural lighting',
-      HIGHLIGHTS:     'minimal infographic style, clean icons, professional business, data visualization aesthetic',
+      TWITTER_THREAD:
+        'modern flat design, bold typography, electric blue and white palette, social media banner style, 16:9',
+      BLOG_POST:
+        'editorial photography style, cinematic lighting, professional, warm tones, magazine cover quality',
+      FACEBOOK_POST:
+        'vibrant lifestyle photography, warm inviting atmosphere, community feel, natural lighting',
+      HIGHLIGHTS:
+        'minimal infographic style, clean icons, professional business, data visualization aesthetic',
     };
 
-    const style = styleGuide[contentType] ?? 'professional digital illustration, clean modern design';
+    const style =
+      styleGuide[contentType] ??
+      'professional digital illustration, clean modern design';
 
-    const trimmed = content.length > 1500
-      ? content.slice(0, 1500) + '...'
-      : content;
+    const trimmed =
+      content.length > 1500 ? content.slice(0, 1500) + '...' : content;
 
     try {
       const response = await this.openrouter.chat.completions.create({
-        model:      'meta-llama/llama-3.3-8b-instruct:free',
+        model: 'meta-llama/llama-3.3-8b-instruct:free',
         max_tokens: 120,
         messages: [
           {
-            role:    'system',
+            role: 'system',
             content: `You are an expert at writing Stable Diffusion / Flux image prompts.
 Your job: read the content and write ONE image generation prompt (max 100 words).
 Rules:
@@ -98,7 +105,7 @@ Rules:
 - Write in English only`,
           },
           {
-            role:    'user',
+            role: 'user',
             content: `Content type: ${contentType}\n\nContent:\n${trimmed}\n\nWrite the image prompt:`,
           },
         ],
@@ -109,7 +116,6 @@ Rules:
       if (prompt.length > 20) return prompt;
 
       return this.fallbackPrompt(content, style);
-
     } catch (err: any) {
       this.logger.warn(`⚠️ AI prompt failed, using fallback: ${err.message}`);
       return this.fallbackPrompt(content, style);

@@ -44,14 +44,17 @@ export class TranscriptionService implements OnModuleInit {
 
   async getTranscript(videoUrl: string): Promise<string> {
     const videoId = extractVideoId(videoUrl);
-    if (!videoId) throw new BadRequestException('Invalid YouTube URL or video ID');
+    if (!videoId)
+      throw new BadRequestException('Invalid YouTube URL or video ID');
 
     this.logger.log(`Fetching transcript for video: ${videoId}`);
 
     try {
       const transcript = await this.fetchCaptions(videoId);
       if (transcript && transcript.trim().length > 20) {
-        this.logger.log(`✅ Captions found. Length: ${transcript.length} chars`);
+        this.logger.log(
+          `✅ Captions found. Length: ${transcript.length} chars`,
+        );
         return transcript;
       }
     } catch (err: any) {
@@ -62,7 +65,11 @@ export class TranscriptionService implements OnModuleInit {
     return await this.transcribeWithWhisper(videoUrl, videoId, 1);
   }
 
-  async retryTranscription(videoUrl: string, videoId: string, attempt: number): Promise<string> {
+  async retryTranscription(
+    videoUrl: string,
+    videoId: string,
+    attempt: number,
+  ): Promise<string> {
     return await this.transcribeWithWhisper(videoUrl, videoId, attempt, true);
   }
 
@@ -83,7 +90,9 @@ export class TranscriptionService implements OnModuleInit {
       transcriptData?.transcript?.content?.body?.initial_segments ?? [];
 
     if (segments.length === 0)
-      throw new Error('Transcript panel not found. Video likely has no transcript.');
+      throw new Error(
+        'Transcript panel not found. Video likely has no transcript.',
+      );
 
     return segments
       .map((seg: any) => seg?.snippet?.text ?? '')
@@ -106,17 +115,19 @@ export class TranscriptionService implements OnModuleInit {
 
         await execAsync(
           `yt-dlp --js-runtimes nodejs` +
-          ` -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"` +
-          ` --no-playlist` +
-          ` -o "${tmpFile}"` +
-          ` "${videoUrl}"`,
+            ` -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"` +
+            ` --no-playlist` +
+            ` -o "${tmpFile}"` +
+            ` "${videoUrl}"`,
         );
 
         const fileSizeMB = fs.statSync(tmpFile).size / (1024 * 1024);
         this.logger.log(`📦 Audio size: ${fileSizeMB.toFixed(1)} MB`);
 
         if (fileSizeMB > 24) {
-          throw new Error(`Audio too large: ${fileSizeMB.toFixed(1)}MB (max 24MB)`);
+          throw new Error(
+            `Audio too large: ${fileSizeMB.toFixed(1)}MB (max 24MB)`,
+          );
         }
       } else {
         this.logger.log(`📁 Using existing audio file (attempt ${attempt})`);
@@ -154,5 +165,4 @@ export class TranscriptionService implements OnModuleInit {
       }
     }
   }
-
 }

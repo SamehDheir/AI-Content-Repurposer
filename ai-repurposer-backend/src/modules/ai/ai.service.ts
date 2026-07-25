@@ -5,29 +5,25 @@ import { ContentType } from '@prisma/client';
 export type ExtendedContentType = ContentType | 'HIGHLIGHTS';
 
 const PROMPTS: Record<ExtendedContentType, string> = {
-  TWITTER_THREAD: 
-    `Create a compelling Twitter thread (5-7 tweets) from this transcript:
+  TWITTER_THREAD: `Create a compelling Twitter thread (5-7 tweets) from this transcript:
     - Tweet 1: A powerful "Hook" that stops the scroll and addresses a core benefit.
     - Tweets 2-5: Practical value, tips, or insights using bullet points for readability.
     - Final Tweet: A strong Call to Action (CTA).
     - Style: Use thread numbering (1/n), relevant emojis, and keep each tweet < 280 chars.`,
 
-  BLOG_POST: 
-    `Write a professional, SEO-friendly blog post based on this transcript:
+  BLOG_POST: `Write a professional, SEO-friendly blog post based on this transcript:
     - Structure: H1 Title, engaging intro using the "PAS" (Problem-Agitation-Solution) framework.
     - Body: 3-4 distinct H2 sections with detailed explanations.
     - Formatting: Use bold text for key concepts and bullet points for lists.
     - Conclusion: A summary paragraph and a final thought.`,
 
-  FACEBOOK_POST: 
-    `Craft an engaging Facebook post for a professional audience:
+  FACEBOOK_POST: `Craft an engaging Facebook post for a professional audience:
     - Opening: Start with a relatable question or a bold statement.
     - Core: Share 3 main takeaways from the content.
     - Closing: Encourage engagement with a question for the readers.
     - Tone: Friendly, authoritative, and community-focused.`,
 
-  HIGHLIGHTS: 
-    `Extract the "Golden Nuggets" (the most impactful moments) from this transcript:
+  HIGHLIGHTS: `Extract the "Golden Nuggets" (the most impactful moments) from this transcript:
     - Identify 3-5 key highlights.
     - For each highlight: Provide a 💡 [Catchy Title] followed by a 2-sentence explanation of its importance.`,
 };
@@ -42,7 +38,7 @@ export class AIService {
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
       defaultHeaders: {
-        'HTTP-Referer': 'http://localhost:3000', 
+        'HTTP-Referer': 'http://localhost:3000',
         'X-Title': 'AI Content Repurposer',
       },
     });
@@ -91,11 +87,12 @@ export class AIService {
 
       this.logger.log(`✅ "${type}" generated successfully.`);
       return content;
-
     } catch (error: any) {
       this.logger.error(`❌ AI Generation Failed: ${error.message}`);
       if (error.status === 429) {
-        throw new Error('The service is currently busy, please try again in a minute');
+        throw new Error(
+          'The service is currently busy, please try again in a minute',
+        );
       }
       throw new Error(`AI generation failed: ${error.message}`);
     }
