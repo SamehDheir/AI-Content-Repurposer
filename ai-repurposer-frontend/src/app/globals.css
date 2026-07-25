@@ -1,36 +1,543 @@
 @import "tailwindcss";
 
-/* Tailwind 4 defaults `dark:` to prefers-color-scheme. ThemeProvider toggles a
-   `.dark` class on <html> so the in-app switch wins over the OS setting, which
-   means the variant has to be redefined against that class. */
+/* ==========================================================================
+   "Cutting Room" — the design system.
+
+   The product takes raw footage and cuts it into printed pieces, so the whole
+   surface borrows from a film cutting room crossed with a print workshop:
+   newsprint paper, ink black, one vermillion signal colour, hairline rules,
+   timecodes, registration marks and monospace slugs.
+
+   Theming is token-driven. `.dark` / `.light` on <html> (set by ThemeContext
+   and by the pre-paint script in layout.tsx) swap the variables below, and
+   every component styles itself with the resulting Tailwind utilities
+   (bg-paper, text-ink-2, border-rule …) instead of per-class ternaries.
+   ========================================================================== */
+
+/* Kept from Phase 4: Tailwind 4 keys `dark:` to prefers-color-scheme, so the
+   variant is rebound to the class ThemeProvider toggles. The tokens above make
+   `dark:` unnecessary for colour, but it stays correct for the cases they do
+   not cover (a one-off shadow, a borrowed third-party class). */
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+.dark {
+  --paper: #0b0b0a;
+  --surface: #121211;
+  --surface-2: #191917;
+  --ink: #f0ede6;
+  --ink-2: #a8a399;
+  /* ink-3 carries the mono labels, so it has to clear 4.5:1 on --paper. */
+  --ink-3: #867f72;
+  --rule: rgba(240, 237, 230, 0.13);
+  --rule-strong: rgba(240, 237, 230, 0.3);
+  --signal: #ff4d26;
+  --signal-ink: #0b0b0a;
+  --signal-wash: rgba(255, 77, 38, 0.12);
+  /* For the inverted bands (bg-ink): there the background is the *other*
+     theme's paper, so the accent has to flip with it or it goes muddy. */
+  --signal-on-ink: #c7330f;
+  --scrim: rgba(0, 0, 0, 0.72);
+
+  /* Riso inks — one per output format. Used as hairlines and dots only. */
+  --fmt-thread: #4b86f0;
+  --fmt-blog: #d29a37;
+  --fmt-social: #4a9d7c;
+  --fmt-marks: #c25d75;
+
+  --grain-opacity: 0.05;
+  color-scheme: dark;
+}
+
+.light {
+  --paper: #efebe3;
+  --surface: #f7f5f0;
+  --surface-2: #fffdf9;
+  --ink: #14130f;
+  --ink-2: #4a473f;
+  --ink-3: #6e6759;
+  --rule: rgba(20, 19, 15, 0.16);
+  --rule-strong: rgba(20, 19, 15, 0.36);
+  --signal: #c7330f;
+  --signal-ink: #fff8f4;
+  --signal-wash: rgba(199, 51, 15, 0.1);
+  --signal-on-ink: #ff5a38;
+  --scrim: rgba(20, 19, 15, 0.55);
+
+  --fmt-thread: #1d57c4;
+  --fmt-blog: #a06a0b;
+  --fmt-social: #2c7255;
+  --fmt-marks: #9a3550;
+
+  --grain-opacity: 0.045;
+  color-scheme: light;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-signal: var(--signal);
+  --color-signal-ink: var(--signal-ink);
+  --color-signal-wash: var(--signal-wash);
+  --color-signal-on-ink: var(--signal-on-ink);
+  --color-scrim: var(--scrim);
+  --color-fmt-thread: var(--fmt-thread);
+  --color-fmt-blog: var(--fmt-blog);
+  --color-fmt-social: var(--fmt-social);
+  --color-fmt-marks: var(--fmt-marks);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-display-serif);
 }
 
-/* Follows the toggled class, not the OS. These drive `body` below, so keying
-   them off prefers-color-scheme left the page background stuck on the OS
-   preference while every Tailwind class followed the in-app toggle. */
-:root:where(.dark) {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+/* ── Base ───────────────────────────────────────────────────────────────── */
+
+/* Phase 4's --background/--foreground pair is gone: `body` is driven by --paper
+   and --ink now, and nothing referenced bg-background or text-foreground. */
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+/* Paper grain. Fixed so it never scrolls with content — it is the substrate,
+   not a layer of it. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
 
+::selection {
+  background: var(--signal);
+  color: var(--signal-ink);
+}
 
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rule-strong);
+  border: 3px solid var(--paper);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-3);
+}
+
+/* ── Type ───────────────────────────────────────────────────────────────── */
+
+.display {
+  font-family: var(--font-display-serif), Georgia, "Times New Roman", serif;
+  /* Newsreader is variable; 500 keeps the stems solid at both 5rem and 1rem. */
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.02;
+}
+
+/* Big settings can afford to be tighter and lighter than the running text. */
+.display-xl {
+  font-weight: 450;
+  line-height: 0.98;
+  letter-spacing: -0.022em;
+}
+
+/* The micro-label that runs above every block: mono, caps, lightly tracked.
+   Wider tracking looked better and read worse — 11px/0.13em is the point where
+   it still reads as a printed slug but stays legible at a glance. */
+.label {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.slug {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* ── Print furniture ────────────────────────────────────────────────────── */
+
+/* Hard offset shadow instead of a soft blur — ink on paper, not glass. */
+.plate {
+  box-shadow: 5px 5px 0 var(--rule);
+}
+.plate-signal {
+  box-shadow: 5px 5px 0 var(--signal);
+}
+
+/* Registration cross used at grid corners. */
+.regmark {
+  position: relative;
+}
+.regmark::before,
+.regmark::after {
+  content: "";
+  position: absolute;
+  background: var(--rule-strong);
+}
+.regmark::before {
+  left: -0.5px;
+  top: -7px;
+  width: 1px;
+  height: 15px;
+}
+.regmark::after {
+  top: -0.5px;
+  left: -7px;
+  height: 1px;
+  width: 15px;
+}
+
+/* Faint column rules, the way a layout grid shows through newsprint. */
+.gridlines {
+  background-image: linear-gradient(
+    to right,
+    var(--rule) 0 1px,
+    transparent 1px 100%
+  );
+  background-size: 25% 100%;
+}
+
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--rule) 0 1px,
+    transparent 1px 6px
+  );
+}
+
+/* ── Reveal on scroll ───────────────────────────────────────────────────── */
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.75s cubic-bezier(0.22, 0.68, 0.24, 1),
+    transform 0.75s cubic-bezier(0.22, 0.68, 0.24, 1),
+    clip-path 0.75s cubic-bezier(0.22, 0.68, 0.24, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal="wipe"] {
+  clip-path: inset(0 100% 0 0);
+  transform: none;
+}
+[data-reveal].revealed {
+  opacity: 1;
+  transform: none;
+  clip-path: inset(0 0 0 0);
+}
+
+/* ── Keyframes ──────────────────────────────────────────────────────────── */
+
+@keyframes cr-rise {
+  from {
+    transform: translateY(105%) rotate(2deg);
+  }
+  to {
+    transform: translateY(0) rotate(0);
+  }
+}
+
+@keyframes cr-marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes cr-wave {
+  0%,
+  100% {
+    transform: scaleY(0.16);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes cr-playhead {
+  0% {
+    left: 0%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+@keyframes cr-dash {
+  to {
+    stroke-dashoffset: -240;
+  }
+}
+
+@keyframes cr-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cr-travel {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
+/* A short dash running the length of a connector — a pulse on the wire. The
+   414 matches `stroke-dasharray: 14 400`, so exactly one dash crosses. */
+@keyframes cr-wire {
+  from {
+    stroke-dashoffset: 414;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* A line of generated text writing itself in. */
+@keyframes cr-typeline {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* A rubber stamp coming down on a docket — the terminal state of the auth
+   flows, in place of the usual green tick in a circle. */
+@keyframes cr-stamp {
+  0% {
+    opacity: 0;
+    transform: scale(1.7) rotate(-9deg);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.94) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-3deg);
+  }
+}
+
+@keyframes cr-blade {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(370px);
+  }
+}
+
+@keyframes cr-blink {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+}
+
+@keyframes cr-scan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(400%);
+  }
+}
+
+@keyframes cr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes cr-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+@keyframes cr-flicker {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes cr-slot {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes cr-clap {
+  0% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(-13deg);
+  }
+  70% {
+    transform: rotate(1.5deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@keyframes cr-shift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-1.5px, 1px);
+  }
+  75% {
+    transform: translate(1.5px, -1px);
+  }
+}
+
+.anim-marquee {
+  animation: cr-marquee var(--marquee-duration, 34s) linear infinite;
+}
+.anim-spin {
+  animation: cr-spin 1s linear infinite;
+}
+.anim-blink {
+  animation: cr-blink 1.1s steps(1) infinite;
+}
+.anim-pulse {
+  animation: cr-pulse 1.6s ease-in-out infinite;
+}
+
+/* Long-form output rendered inside the viewer. */
+.sheet p {
+  margin-bottom: 0.9rem;
+}
+
+/* Specimen panels on the front page. Each carries its own format ink in
+   `--panel-ink`; hovering drops a hard shadow in that ink. */
+.panel {
+  transition:
+    box-shadow 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-color 0.3s,
+    transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.group:hover .panel,
+.panel:hover {
+  box-shadow: 6px 6px 0 var(--panel-ink, var(--rule-strong));
+  border-color: var(--panel-ink, var(--rule-strong));
+}
+
+/* The mark: a source block on the left, four output chips on the right. They
+   fan apart on hover — the whole product in one gesture. */
+.mark-chip {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mark:hover .mark-chip-a {
+  transform: translate(1.6px, -1.6px);
+}
+.mark:hover .mark-chip-b {
+  transform: translate(3.2px, -1.6px);
+}
+.mark:hover .mark-chip-c {
+  transform: translate(1.6px, 1.6px);
+}
+.mark:hover .mark-chip-d {
+  transform: translate(3.2px, 1.6px);
+}
+.mark-source {
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.mark:hover .mark-source {
+  transform: translateX(-1.6px);
+}
+
+/* Theme-conditional bits (the toggle's icons). Driven by the class on <html>
+   so they are correct at first paint, before React knows the theme. */
+.only-light {
+  display: none;
+}
+.light .only-light {
+  display: block;
+}
+.light .only-dark {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    clip-path: none;
+  }
+}

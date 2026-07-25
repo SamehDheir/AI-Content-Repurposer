@@ -1,8 +1,10 @@
 "use client";
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
-import { Sparkles, AlertCircle, CheckCircle, Lock } from "lucide-react";
+import { AuthShell, Stamp, Problem, Action } from "@/components/auth/AuthShell";
+import { Field } from "@/components/auth/Field";
 
 // useSearchParams() opts the subtree out of prerendering, so it needs its own
 // Suspense boundary or `next build` fails on this route.
@@ -14,145 +16,147 @@ export default function ResetPasswordPage() {
   );
 }
 
+/** A requirement that ticks over as it is met. */
+function Rule({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  return (
+    <li className="label flex items-center gap-2.5" style={{ color: ok ? "var(--fmt-social)" : "var(--ink-3)" }}>
+      <span
+        className="h-2.5 w-2.5 shrink-0 border transition-colors"
+        style={{
+          borderColor: ok ? "var(--fmt-social)" : "var(--rule-strong)",
+          background: ok ? "var(--fmt-social)" : "transparent",
+        }}
+      />
+      {children}
+    </li>
+  );
+}
+
 function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const token = useSearchParams().get("token");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [done, setDone] = useState(false);
 
-  const token = searchParams.get("token");
+  const longEnough = password.length >= 8;
+  const matches = password.length > 0 && password === confirm;
+  const ready = longEnough && matches && !!token;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
-    if (!token) {
-      setError("Invalid reset link");
-      return;
-    }
-
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
+    if (!token) return setError("This reset link is missing its token.");
+    if (!longEnough) return setError("Password must be at least 8 characters.");
+    if (!matches) return setError("The two passwords do not match.");
 
     setLoading(true);
     try {
       await api.resetPassword(token, password);
-      setSuccess(true);
-      
-      // Redirect to login after 2 seconds
-      setTimeout(() => {
-        router.push("/login");
-      }, 2000);
-    } catch (e: any) {
-      setError(e.message || "Password reset failed");
+      setDone(true);
+      setTimeout(() => router.push("/login"), 2000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not reset that password.");
     } finally {
       setLoading(false);
     }
   };
 
-  if (success) {
+  if (done) {
     return (
-      <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center p-4">
-        <div className="w-full max-w-sm text-center">
-          <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-            <CheckCircle size={32} className="text-green-500" />
-          </div>
-          <h1 className="text-xl font-bold text-zinc-100 mb-2">Password Reset!</h1>
-          <p className="text-sm text-zinc-500 mb-6">Your password has been reset successfully</p>
-          <p className="text-xs text-zinc-600">Redirecting to login...</p>
-        </div>
-      </div>
+      <AuthShell
+        index="04"
+        kicker="New key"
+        title={
+          <>
+            Cut and <em className="italic text-signal">filed</em>.
+          </>
+        }
+      >
+        <Stamp label="Password reset" />
+        <p className="mt-7 text-[14.5px] leading-[1.7] text-ink-2">
+          The new password is live and the reset link has been spent. Taking you back to the door
+          now.
+        </p>
+        <p className="label mt-6 flex items-center gap-2 text-ink-3">
+          <span
+            className="h-3 w-3 border border-current"
+            style={{ animation: "cr-spin 0.9s linear infinite" }}
+          />
+          Redirecting to sign in
+        </p>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0e0e10] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background glow */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[600px] h-[600px] rounded-full bg-indigo-600/8 blur-[120px]" />
-      </div>
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" />
-
-      <div className="relative w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-2xl shadow-indigo-500/30 mb-4">
-            <Lock size={20} className="text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-zinc-100 tracking-tight">Reset Password</h1>
-          <p className="text-sm text-zinc-500 mt-1">Enter your new password</p>
-        </div>
-
-        {/* Card */}
-        <div className="rounded-2xl border border-white/10 bg-zinc-900 p-6 shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="block text-xs font-medium text-zinc-500 mb-1.5">New Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={8}
-                className="w-full px-4 py-2.5 rounded-xl bg-zinc-800 border border-white/10 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/60 transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-zinc-500 mb-1.5">Confirm Password</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={8}
-                className="w-full px-4 py-2.5 rounded-xl bg-zinc-800 border border-white/10 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-indigo-500/60 transition-all"
-              />
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                <AlertCircle size={13} className="text-red-400 shrink-0" />
-                <p className="text-xs text-red-400">{error}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 mt-1 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-              ) : (
-                "Reset Password"
-              )}
-            </button>
-          </form>
-        </div>
-
-        <p className="text-center mt-4 text-xs text-zinc-600">
-          Remember your password?{" "}
-          <button
-            onClick={() => router.push("/login")}
-            className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
-          >
-            Sign in
-          </button>
+    <AuthShell
+      index="04"
+      kicker="New key"
+      title={
+        <>
+          Set a <em className="italic text-signal">new one</em>.
+        </>
+      }
+      deck="Pick something you have not used here before. Eight characters is the floor, not the target."
+      footer={
+        <p className="label text-center text-ink-3">
+          Link gone stale?{" "}
+          <Link href="/forgot-password" className="text-signal underline underline-offset-4">
+            Ask for another
+          </Link>
         </p>
-      </div>
-    </div>
+      }
+    >
+      <form onSubmit={submit} className="space-y-6">
+        {/* Surfaced before submitting, rather than after a wasted attempt. */}
+        {!token && <Problem>This reset link is missing its token. Ask for a fresh one.</Problem>}
+
+        <Field
+          id="password"
+          label="New password"
+          type="password"
+          value={password}
+          onChange={(v) => {
+            setPassword(v);
+            setError("");
+          }}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          minLength={8}
+          autoFocus
+        />
+
+        <Field
+          id="confirm"
+          label="Again, to be sure"
+          type="password"
+          value={confirm}
+          onChange={(v) => {
+            setConfirm(v);
+            setError("");
+          }}
+          placeholder="••••••••"
+          autoComplete="new-password"
+          minLength={8}
+        />
+
+        {password.length > 0 && (
+          <ul className="space-y-2.5 border-t border-rule pt-4">
+            <Rule ok={longEnough}>At least 8 characters</Rule>
+            <Rule ok={matches}>Both fields match</Rule>
+          </ul>
+        )}
+
+        {error && <Problem>{error}</Problem>}
+
+        <Action type="submit" loading={loading} loadingLabel="Filing" disabled={!ready}>
+          Reset the password
+        </Action>
+      </form>
+    </AuthShell>
   );
 }

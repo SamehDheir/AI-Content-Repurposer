@@ -1,79 +1,70 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { Zap } from "lucide-react";
+import { api, type Me } from "@/lib/api";
 
-interface MeResponse {
-  plan: "FREE" | "PRO";
-  usage: {
-    used:      number;
-    limit:     number | null;
-    remaining: number | null;
-    resetsAt:  string;
-  };
-}
-
+/**
+ * The meter on the desk: how much of this month's stock is left. Drawn as
+ * discrete slots rather than a percentage bar, because on the free plan the
+ * whole month is a single slot and a 100%-full bar reads as an error.
+ */
 export function UsageBanner() {
-  const [data, setData] = useState<MeResponse | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
 
   useEffect(() => {
-    api.getMe().then(setData).catch(() => {});
+    api.getMe().then(setMe).catch(() => {});
   }, []);
 
-  if (!data || data.plan === "PRO") return null;
+  if (!me) {
+    return (
+      <span className="label inline-block h-4 w-40 animate-pulse bg-rule" aria-hidden="true" />
+    );
+  }
 
-  const { used, limit, remaining, resetsAt } = data.usage;
-  const pct      = limit ? Math.min((used / limit) * 100, 100) : 0;
-  const isLimit  = remaining === 0;
-  const isWarn   = !isLimit && remaining !== null && remaining <= 2;
+  if (me.plan === "PRO") {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="label text-ink-3">Stock</span>
+        <span className="label border border-signal px-2 py-1 text-signal">Pro</span>
+        <span className="label text-ink-3">Unmetered</span>
+      </div>
+    );
+  }
+
+  const { used, limit, remaining, resetsAt } = me.usage;
+  const slots = limit ?? 1;
+  const spent = remaining === 0;
 
   return (
-    <div className={`rounded-xl border p-4 transition-all ${
-      isLimit ? "border-red-500/30 bg-red-500/8"
-      : isWarn ? "border-amber-500/30 bg-amber-500/8"
-      : "border-white/10 bg-white/5"
-    }`}>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <div className={`w-5 h-5 rounded-md flex items-center justify-center ${
-            isLimit ? "bg-red-500/20" : isWarn ? "bg-amber-500/20" : "bg-zinc-700"
-          }`}>
-            <Zap size={11} className={isLimit ? "text-red-400" : isWarn ? "text-amber-400" : "text-zinc-400"} />
-          </div>
-          <span className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">
-            Free plan
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-semibold tabular-nums ${
-            isLimit ? "text-red-400" : isWarn ? "text-amber-400" : "text-zinc-400"
-          }`}>
-            {used} / {limit}
-          </span>
-          {!isLimit && (
-            <span className="text-xs text-zinc-600">
-              resets {new Date(resetsAt).toLocaleDateString("en", { month: "short", day: "numeric" })}
-            </span>
-          )}
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="label text-ink-3">Stock</span>
+      <span className="label border border-rule px-2 py-1 text-ink-2">Free</span>
 
-      {/* Progress track */}
-      <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${
-            isLimit ? "bg-red-500"
-            : isWarn ? "bg-amber-500"
-            : "bg-indigo-500"
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <span className="flex items-center gap-1" aria-hidden="true">
+        {Array.from({ length: Math.min(slots, 12) }, (_, i) => (
+          <span
+            key={i}
+            className={`h-3 w-2.5 border transition-colors duration-500 ${
+              i < used
+                ? spent
+                  ? "border-signal bg-signal"
+                  : "border-ink-2 bg-ink-2"
+                : "border-rule-strong"
+            }`}
+          />
+        ))}
+      </span>
 
-      {isLimit && (
-        <p className="mt-2 text-xs text-red-400/80">
-          Monthly limit reached. Upgrade to Pro for unlimited videos.
-        </p>
+      <span className={`label ${spent ? "text-signal" : "text-ink-3"}`}>
+        {used}/{limit} used
+      </span>
+
+      <span className="label hidden text-ink-3 sm:inline" suppressHydrationWarning>
+        · resets{" "}
+        {new Date(resetsAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+      </span>
+
+      {spent && (
+        <span className="label text-signal">— next month, or go Pro</span>
       )}
     </div>
   );

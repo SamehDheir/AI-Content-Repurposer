@@ -113,8 +113,12 @@ export class TranscriptionService implements OnModuleInit {
       if (!useExistingFile || !fs.existsSync(tmpFile)) {
         this.logger.log(`⬇️ Downloading audio via yt-dlp (no ffmpeg)...`);
 
+        // The runtime is named `node`, not `nodejs`. yt-dlp does not fail on an
+        // unknown name — it warns, drops the runtime, and then cannot extract
+        // from YouTube at all, reporting the misleading "This video is not
+        // available" for videos that are perfectly available.
         await execAsync(
-          `yt-dlp --js-runtimes nodejs` +
+          `yt-dlp --js-runtimes node` +
             ` -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"` +
             ` --no-playlist` +
             ` -o "${tmpFile}"` +

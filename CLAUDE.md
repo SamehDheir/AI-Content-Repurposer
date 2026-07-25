@@ -57,12 +57,20 @@ Migration history is a single squashed baseline (`20260723140000_init`) that rep
 
 Prisma 7: `schema.prisma` has **no `url` in the datasource block** — the connection string comes from [prisma.config.ts](ai-repurposer-backend/prisma.config.ts), which loads `DATABASE_URL` via dotenv. At runtime `PrismaService` uses the `@prisma/adapter-pg` driver adapter rather than the Rust engine's own connection handling.
 
-Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH` (`yt-dlp --js-runtimes nodejs`). Without it, only videos that already have YouTube captions will process — `TranscriptionService.onModuleInit` logs a warning at boot if it is missing. The backend Docker image installs it along with Python.
+Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH`. Without it, only videos that already have YouTube captions will process — `TranscriptionService.onModuleInit` logs a warning at boot if it is missing. The backend Docker image installs it along with Python.
+
+YouTube extraction now needs a JavaScript runtime, so the command passes `--js-runtimes node`. **The runtime is `node`, not `nodejs`** — yt-dlp does not reject an unknown name, it warns, silently drops the runtime, and then fails every video with `ERROR: [youtube] <id>: This video is not available`, which looks like a dead or private video rather than a local misconfiguration. If transcription starts failing wholesale, check for `Ignoring unsupported JavaScript runtime(s)` in the log first, and confirm by hand:
+
+```bash
+yt-dlp --js-runtimes node --simulate --print "%(id)s|%(duration)s" "<url>"
+```
+
+The download requests `bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio` but always writes to a `.webm` filename, and there is no ffmpeg to remux. Where a video offers no webm audio, that leaves m4a bytes in a `.webm` file, which Groq may reject on the filename — a known rough edge, not yet hit in practice.
 
 ### Frontend (`ai-repurposer-frontend/`)
 
 ```bash
-npm run dev                   # :3000
+npm run dev                   # :3000 — port is pinned, see Ports below
 npm run build && npm start
 npm run lint
 ```
@@ -80,6 +88,15 @@ Frontend **3000**, backend **3001**. Four settings have to agree, and getting on
 | backend `FRONTEND_URL` | `http://localhost:3000` (verification and reset links) |
 | backend `GOOGLE_CALLBACK_URL` | `http://localhost:3001/auth/google/callback` |
 | frontend `NEXT_PUBLIC_API_URL` | `http://localhost:3001` |
+
+**The frontend scripts pin `-p 3000` on purpose.** Without an explicit port, `next dev` silently falls back to the next free one when 3000 is taken — which is **3001**, the backend's port. It then wins the race against a still-compiling Nest, the API dies on `EADDRINUSE` in the background, and every call from the browser hits the Next server instead: uniform `500 Internal Server Error` with no CORS headers on every endpoint, including `OPTIONS`. With `-p 3000` Next fails loudly instead. If the symptom ever reappears, check who actually owns the port before suspecting CORS:
+
+```bash
+netstat -ano | grep ":3001.*LISTENING"     # → PID
+powershell -Command "Get-CimInstance Win32_Process -Filter 'ProcessId=<PID>' | Select -Expand CommandLine"
+```
+
+Note also that `rm -rf .next` or a `next build` while `next dev` is running leaves the dev server serving 500s, and can truncate `.next/dev/types/routes.d.ts` — which is in `tsconfig.json`'s `include`, so the *next* build then fails with a bogus `Declaration or statement expected` in generated code. Stop the dev server first.
 
 ## Architecture
 
@@ -130,10 +147,23 @@ Two independent mechanisms, easy to confuse:
 - Backend filenames are all lowercase. `Prisma.module.ts` was renamed to `prisma.module.ts` because the mixed-casing imports only worked on Windows and broke on a case-sensitive filesystem — keep new files lowercase.
   - That rename was made on disk in Phase 3 but **did not reach git until Phase 4**: `core.ignorecase=true` on Windows meant git kept tracking `Prisma.module.ts`, so a checkout on Linux still produced the capitalised name and the build broke. If you rename only the case of a file, verify with `git ls-tree -r --name-only HEAD | grep -i <name>` — `git status` will look clean either way.
 - `main.ts` registers a global `ValidationPipe({ whitelist: true, transform: true })`, so every `@Body()` needs a DTO class to be validated — an inline object type silently skips validation entirely. DTOs live in `src/modules/jobs/dto/` and `src/modules/auth/dto/`. Note that `whitelist` strips undecorated properties, so a field without a decorator never reaches the handler.
-- Dark/light theming uses Tailwind's **`dark:` variant**, not `useTheme()` ternaries. Write `className="bg-white dark:bg-zinc-900"`. `ThemeProvider` toggles a `.dark` class on `<html>`, and `globals.css` rebinds the variant to that class with `@custom-variant dark (&:where(.dark, .dark *))` — without that line Tailwind 4 would key `dark:` to the OS `prefers-color-scheme` and ignore the in-app toggle.
-  - Reach for `useTheme()` only when the branch is not CSS (the Sun/Moon icon swap, the "Light Mode"/"Dark Mode" label). If you are picking between two class strings, it is a `dark:` variant.
+- Dark/light theming is **token-driven** — see the design system below. Phase 4 replaced the old `useTheme()` ternaries with Tailwind's `dark:` variant; the redesign then replaced the colours themselves with semantic tokens (`bg-paper`, `text-ink-2`, `border-rule`), which is what you should reach for now. `@custom-variant dark (&:where(.dark, .dark *))` is still in `globals.css` and still required: without it Tailwind 4 keys `dark:` to the OS `prefers-color-scheme` and ignores the in-app toggle.
+  - Reach for `useTheme()` only when the branch is not CSS at all. The theme toggle's own icons switch via `.only-dark` / `.only-light` instead, so they are correct on the first paint rather than after hydration.
   - Tailwind scans source for **complete** class names, so never build one by concatenation — `border-b-${dark ? '[#141416]' : 'white'}` generates nothing. This bug shipped in `ContentViewer` until Phase 4.
 - Dashboard components (`JobCard`, `ContentViewer`, `UsageBanner`) are `React.lazy` + `Suspense` loaded; keep new heavy components on that path.
+
+### The design system ("Cutting Room")
+
+The marketing page, the dashboard and the auth pages share one system defined in [globals.css](ai-repurposer-frontend/src/app/globals.css). Read it before styling anything new.
+
+- **Theming is token-driven, not ternary-driven.** `.dark` / `.light` on `<html>` swap CSS variables, and `@theme inline` turns them into ordinary utilities: `bg-paper`, `bg-surface`, `text-ink` / `text-ink-2` / `text-ink-3`, `border-rule` / `border-rule-strong`, `text-signal`, `bg-signal-wash`, `bg-scrim`. Use those. Do **not** reintroduce `theme === 'dark' ? … : …` per-`className` ternaries — no page uses them any more. `useTheme()` remains for behaviour (the toggle); the toggle's own icons swap via `.only-dark` / `.only-light` so they are right on first paint.
+- **The auth pages share one kit** in [src/components/auth/](ai-repurposer-frontend/src/components/auth/). `AuthShell` is the docket chrome (header, plate, footer) used by `forgot-password`, `reset-password`, `verify-email` and `auth/callback`; it exports `Stamp` (the rubber-stamp terminal state, in place of a tick in a circle), `Problem` (the signal error strip) and `Action` (the primary button). `Field` is the mono-labelled rule input, shared with `/login`. Reuse these rather than restyling a form inline — `/login` keeps its own two-column layout because it is the front door, but draws its fields from the same `Field`.
+- **`--signal-on-ink` exists for inverted bands.** On `bg-ink` the background is the *other* theme's paper, so a normal `text-signal` goes muddy. The homepage ticker and the login side panel use it.
+- **Four riso inks, one per output format** — `--fmt-thread`, `--fmt-blog`, `--fmt-social`, `--fmt-marks`. They appear as hairlines, dots and small rules only, never as gradients, and the same colour tracks a format from the homepage specimen to the ledger row to the viewer's index tab.
+- **Type**: `.display` (Newsreader, the editorial serif — add `.display-xl` for settings above ~2.5rem), `.label` (11px mono caps, 0.13em, the metadata slug that opens most blocks), `.slug` (mono, tabular, for URLs, ids and timecodes). Newsreader replaced Instrument Serif because a high-contrast display face went faint at small sizes and on the dark theme.
+- **Motion** lives in `cr-*` keyframes in globals.css and is applied via inline `style={{ animation: … }}` or the `.anim-*` helpers. Scroll reveals go through `<Reveal>` / `useReveal`, which shares one IntersectionObserver across the page. Everything is disabled under `prefers-reduced-motion`.
+- Corners are square (or ≤2px), depth is a hard offset shadow (`.plate`, or `shadow-[4px_4px_0_var(--rule-strong)]`) rather than a blur, and `.hatch` / `.gridlines` / `.regmark` supply the print furniture.
+- `layout.tsx` runs a pre-paint inline script that sets the theme class before React hydrates; without it the whole page flashes in the wrong theme.
 - Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer.
 - Adding a `ContentType` requires changes in four places: the Prisma enum, `CONTENT_TYPES` in the processor, `PROMPTS` in `ai.service.ts`, and the frontend `TABS`/content components.
 - `extractVideoId` lives in `src/common/utils/youtube.util.ts`. `JobsProcessor` and `TranscriptionService` both call it — do not re-inline a copy, which is how it drifted before.

@@ -1,57 +1,53 @@
 "use client";
 import { useState } from "react";
-import { Copy, Check } from "lucide-react";
 import { parseTweets } from "./parsers";
 
-interface Props { body: string }
-
-export function TwitterContent({ body }: Props) {
+export function TwitterContent({ body }: { body: string }) {
   const tweets = parseTweets(body);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
 
-  const copyTweet = async (text: string, idx: number) => {
+  const copyOne = async (text: string, idx: number) => {
     await navigator.clipboard.writeText(text.trim());
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 1500);
   };
 
   return (
-    <div className="space-y-3">
-      {tweets.map((tweet, idx) => (
-        <div
-          key={idx}
-          className={"group relative p-4 rounded-xl border transition-all duration-200 border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-300 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/8 dark:hover:border-white/20"}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 flex-1 min-w-0">
-              <span className="shrink-0 w-6 h-6 rounded-full bg-sky-500/20 text-sky-500 text-xs font-bold flex items-center justify-center mt-0.5">
-                {idx + 1}
-              </span>
-              <p className={"text-sm leading-relaxed whitespace-pre-wrap text-gray-900 dark:text-zinc-200"}>
-                {tweet.trim()}
-              </p>
-            </div>
-            <button
-              onClick={() => copyTweet(tweet, idx)}
-              className={"shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg transition-all text-gray-400 hover:text-gray-600 hover:bg-gray-200 dark:text-zinc-500 dark:hover:text-zinc-300 dark:hover:bg-white/10"}
-              aria-label="Copy tweet"
-            >
-              {copiedIdx === idx
-                ? <Check size={13} className="text-emerald-500" />
-                : <Copy size={13} />
-              }
-            </button>
-          </div>
-          <div className="mt-2 ml-9 flex items-center justify-between">
-            <span className={`text-xs font-medium tabular-nums ${tweet.length > 260 ? "text-red-500" : "text-gray-500 dark:text-zinc-600"}`}>
-              {tweet.length} / 280
+    <ol className="border-t border-rule">
+      {tweets.map((tweet, idx) => {
+        const text = tweet.trim();
+        const over = text.length > 280;
+        const tight = !over && text.length > 260;
+        return (
+          <li key={idx} className="group flex gap-4 border-b border-rule py-4">
+            <span className="label w-8 shrink-0 pt-1 text-fmt-thread">
+              {idx + 1}/{tweets.length}
             </span>
-            {tweet.length > 260 && (
-              <span className="text-xs text-red-500">Too long</span>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="whitespace-pre-wrap text-[14.5px] leading-[1.7] text-ink">{text}</p>
+              <div className="mt-2.5 flex items-center gap-3">
+                <span
+                  className={`label tabular-nums ${
+                    over ? "text-signal" : tight ? "text-fmt-blog" : "text-ink-3"
+                  }`}
+                >
+                  {text.length} / 280
+                </span>
+                {over && <span className="label text-signal">over the line</span>}
+                <span className="h-px flex-1 bg-rule" />
+                <button
+                  onClick={() => copyOne(text, idx)}
+                  className="label text-ink-3 opacity-0 transition-all hover:text-signal focus-visible:opacity-100 group-hover:opacity-100"
+                  aria-label={`Copy post ${idx + 1}`}
+                >
+                  {copiedIdx === idx ? "Copied ✓" : "Copy"}
+                </button>
+              </div>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
