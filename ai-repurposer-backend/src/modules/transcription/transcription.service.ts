@@ -9,12 +9,33 @@ import Groq from 'groq-sdk';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 
 import { extractVideoId } from '@/common/utils/youtube.util';
 
-const execAsync = promisify(exec);
+/**
+ * `execFile`, never `exec`.
+ *
+ * `exec` hands the whole command to `/bin/sh -c`, and this service used to build
+ * that string by interpolating the job's `videoUrl` into it. Inside double
+ * quotes sh still expands `$(...)` and backticks, and the DTO's URL regex was
+ * anchored only at the start, so `https://youtu.be/<11 chars>$(...)` satisfied
+ * both `@IsUrl` and `@Matches` and reached the shell. That was remote code
+ * execution for any signed-up user, replayed from `job.data` on every retry.
+ *
+ * `execFile` takes an argv array and spawns the binary directly, so no argument
+ * is ever parsed as shell syntax.
+ */
+const execFileAsync = promisify(execFile);
+
+/** yt-dlp gets a URL we built, never one a user typed. See `canonicalUrl`. */
+function canonicalUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+/** A wedged download must not hold a worker slot forever. */
+const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class TranscriptionService implements OnModuleInit {
@@ -31,7 +52,7 @@ export class TranscriptionService implements OnModuleInit {
    */
   async onModuleInit(): Promise<void> {
     try {
-      const { stdout } = await execAsync('yt-dlp --version');
+      const { stdout } = await execFileAsync('yt-dlp', ['--version']);
       this.logger.log(`yt-dlp ${stdout.trim()} detected`);
     } catch {
       this.logger.warn(
@@ -62,15 +83,13 @@ export class TranscriptionService implements OnModuleInit {
     }
 
     this.logger.log('🎙️ Falling back to Whisper transcription...');
-    return await this.transcribeWithWhisper(videoUrl, videoId, 1);
+    return await this.transcribeWithWhisper(videoId, 1);
   }
 
-  async retryTranscription(
-    videoUrl: string,
-    videoId: string,
-    attempt: number,
-  ): Promise<string> {
-    return await this.transcribeWithWhisper(videoUrl, videoId, attempt, true);
+  // Takes the extracted id rather than the URL: the caller's string never
+  // reaches the subprocess, so there is nothing to escape.
+  async retryTranscription(videoId: string, attempt: number): Promise<string> {
+    return await this.transcribeWithWhisper(videoId, attempt, true);
   }
 
   async cleanupAudioFile(videoId: string): Promise<void> {
@@ -102,7 +121,6 @@ export class TranscriptionService implements OnModuleInit {
   }
 
   private async transcribeWithWhisper(
-    videoUrl: string,
     videoId: string,
     attempt: number = 1,
     useExistingFile: boolean = false,
@@ -113,16 +131,27 @@ export class TranscriptionService implements OnModuleInit {
       if (!useExistingFile || !fs.existsSync(tmpFile)) {
         this.logger.log(`⬇️ Downloading audio via yt-dlp (no ffmpeg)...`);
 
+        // One argv entry per argument. The quotes that used to wrap the format
+        // selector and the paths were shell quoting and must not survive here —
+        // execFile passes each element through verbatim.
+        //
         // The runtime is named `node`, not `nodejs`. yt-dlp does not fail on an
         // unknown name — it warns, drops the runtime, and then cannot extract
         // from YouTube at all, reporting the misleading "This video is not
         // available" for videos that are perfectly available.
-        await execAsync(
-          `yt-dlp --js-runtimes node` +
-            ` -f "bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio"` +
-            ` --no-playlist` +
-            ` -o "${tmpFile}"` +
-            ` "${videoUrl}"`,
+        await execFileAsync(
+          'yt-dlp',
+          [
+            '--js-runtimes',
+            'node',
+            '-f',
+            'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
+            '--no-playlist',
+            '-o',
+            tmpFile,
+            canonicalUrl(videoId),
+          ],
+          { timeout: DOWNLOAD_TIMEOUT_MS },
         );
 
         const fileSizeMB = fs.statSync(tmpFile).size / (1024 * 1024);

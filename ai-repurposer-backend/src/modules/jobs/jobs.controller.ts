@@ -10,6 +10,7 @@ import {
   MessageEvent,
   NotFoundException,
   BadRequestException,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
@@ -18,7 +19,6 @@ import { Observable, defer, timer } from 'rxjs';
 import { repeat, takeWhile, map } from 'rxjs/operators';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
-import { GenerateImageDto } from './dto/generate-image.dto';
 import { ImageService } from '@/modules/image/image.service';
 
 /** How long to wait before the next status query, by age of the stream. */
@@ -57,7 +57,7 @@ export class JobsController {
 
   @Get(':id')
   @UseGuards(AuthGuard('jwt'))
-  async getJob(@Param('id') id: string, @Req() req: Request) {
+  async getJob(@Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
     const user = req.user as { id: string };
     const job = await this.jobsService.getJob(id, user.id);
     if (!job) throw new NotFoundException('Job not found');
@@ -75,7 +75,7 @@ export class JobsController {
   @Sse(':id/status')
   @UseGuards(AuthGuard('jwt'))
   streamJobStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
   ): Observable<MessageEvent> {
     const { id: userId } = req.user as { id: string };
@@ -91,24 +91,19 @@ export class JobsController {
     );
   }
 
-  @Post('generate-image')
-  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 image generations per minute
-  @UseGuards(AuthGuard('jwt'))
-  async generateImage(@Body() body: GenerateImageDto) {
-    if (body.content && body.contentType) {
-      return this.imageService.generateImageFromContent(
-        body.content,
-        body.contentType,
-        { country: body.country },
-      );
-    }
-    return this.imageService.generateImage(body.prompt!);
-  }
-
+  // `POST /jobs/generate-image` used to live here: authenticated, but scoped to
+  // nothing. It accepted 20 000 characters of arbitrary text and spent
+  // OpenRouter credit on it without touching the user's quota, so a FREE
+  // account with a limit of one job a month could generate images all day. No
+  // client ever called it — the frontend only uses the `:id` route below — so
+  // it is removed rather than metered.
   @Post(':id/generate-image')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 job image generations per minute
   @UseGuards(AuthGuard('jwt'))
-  async generateImageForJob(@Param('id') id: string, @Req() req: Request) {
+  async generateImageForJob(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+  ) {
     const user = req.user as { id: string };
     const job = await this.jobsService.getJob(id, user.id);
 
