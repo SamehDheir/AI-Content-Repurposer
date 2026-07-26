@@ -152,6 +152,20 @@ export function JobCard({ job, index, onUpdate, onView }: Props) {
           <span className="hidden h-8 w-[74px] sm:block" aria-hidden="true" />
         )}
       </div>
+
+      {/* A failed take used to say only "Failed". The reason arrives on the row
+          itself, so the reader does not have to open anything to learn that the
+          video was private or that it was simply too long. `basis-full` makes
+          it wrap onto its own line inside the existing flex row. */}
+      {failed && job.error && (
+        <p
+          role="status"
+          className="basis-full border-t border-rule pt-2.5 text-[12.5px] leading-[1.6] text-ink-3"
+        >
+          <span className="label me-2 text-signal">Why</span>
+          {job.error}
+        </p>
+      )}
     </article>
   );
 }

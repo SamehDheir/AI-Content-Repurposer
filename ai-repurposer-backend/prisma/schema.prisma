@@ -15,8 +15,10 @@ model User {
   googleId                String?  @unique
   refreshToken            String?
   plan                    Plan     @default(FREE)
-  jobsUsedThisMonth       Int      @default(0)
-  usagePeriodStart        DateTime @default(now())
+  // `jobsUsedThisMonth` and `usagePeriodStart` used to sit here. Nothing ever
+  // read or wrote them — Redis is the sole quota store (see usage.service.ts) —
+  // so they looked authoritative while always holding their defaults. Removed
+  // rather than left as a trap. Quota still resets if Redis is flushed.
   createdAt               DateTime @default(now())
   emailVerified           Boolean  @default(false)
   emailVerificationToken  String?  @unique
@@ -54,6 +56,10 @@ model Job {
   // Null means Modern Standard Arabic, which is what every job predating this
   // column used. See src/common/config/dialects.config.ts.
   country          String?
+  // Why a FAILED job failed, phrased for the person who submitted it. Only ever
+  // set from the mapped constants in job-error.ts — never a raw exception
+  // message, which would leak temp-file paths and the yt-dlp command line.
+  error            String?
   createdAt        DateTime           @default(now())
   userId           String
   user             User               @relation(fields: [userId], references: [id])

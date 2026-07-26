@@ -42,6 +42,12 @@ export interface JobSummary {
   language: string;
   /** ISO-2 country whose dialect was targeted. Null means Modern Standard. */
   country?: string | null;
+  /**
+   * Why a FAILED job failed, already phrased for the reader. The backend maps
+   * every internal error to a fixed set of messages, so this never carries a
+   * stack trace or a file path.
+   */
+  error?: string | null;
   createdAt: string;
   imageUrl?: string;
   generatedContent: { type: ContentType }[];

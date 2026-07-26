@@ -9,8 +9,9 @@ import { RedisModule } from '@/infra/redis/redis.module';
 import { UsageModule } from '@/modules/usage/usage.module';
 import { ImageModule } from '@/modules/image/image.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { validateEnv } from '@/common/config/env.validation';
+import { AllExceptionsFilter } from '@/common/filters/all-exceptions.filter';
 
 @Module({
   imports: [
@@ -57,6 +58,10 @@ import { validateEnv } from '@/common/config/env.validation';
     // override on login, register and job creation, were decorative. Login was
     // unlimited.
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Turns an unhandled Prisma or network error into a real status code
+    // instead of a bare 500, and keeps the detail in the log rather than the
+    // response body.
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
 })
 export class AppModule {}
