@@ -22,6 +22,7 @@ export class JobsService {
     videoUrl: string,
     userId: string,
     language: 'Arabic' | 'English' = 'Arabic',
+    country?: string | null,
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -41,15 +42,26 @@ export class JobsService {
 
     let jobId: string | undefined;
 
+    // A dialect only means anything in Arabic, so an English job never carries
+    // one — otherwise a stale selection would sit on the row misreporting what
+    // was written.
+    const dialect = language === 'Arabic' ? (country ?? null) : null;
+
     try {
       const job = await this.prisma.job.create({
-        data: { videoUrl, status: 'QUEUED', language, userId },
+        data: {
+          videoUrl,
+          status: 'QUEUED',
+          language,
+          country: dialect,
+          userId,
+        },
       });
       jobId = job.id;
 
       await this.repurposeQueue.add(
         'process-video',
-        { jobId: job.id, videoUrl, language },
+        { jobId: job.id, videoUrl, language, country: dialect },
         { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
       );
 

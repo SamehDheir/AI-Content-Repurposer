@@ -1,4 +1,5 @@
 import { IsIn, IsNotEmpty, IsOptional, IsUrl, Matches } from 'class-validator';
+import { COUNTRY_CODES } from '@/common/config/dialects.config';
 
 // The worker can only handle YouTube sources, so reject anything else at the
 // boundary rather than letting it fail three retries deep in the queue.
@@ -16,4 +17,15 @@ export class CreateJobDto {
     message: 'language must be either Arabic or English',
   })
   language?: 'Arabic' | 'English' = 'Arabic';
+
+  /**
+   * Which country's spoken Arabic to write in. Omitted means Modern Standard
+   * Arabic, which is what every job did before this existed. Ignored when the
+   * language is English.
+   */
+  @IsOptional()
+  @IsIn(COUNTRY_CODES, {
+    message: `country must be one of: ${COUNTRY_CODES.join(', ')}`,
+  })
+  country?: string;
 }

@@ -108,7 +108,10 @@ export function JobCard({ job, index, onUpdate, onView }: Props) {
         <p className="label mt-1.5 flex items-center gap-2 text-ink-3">
           <span className="tabular-nums">{frame}</span>
           <span className="h-2 w-px bg-rule" />
+          {/* The ledger row is tight, so the dialect rides as its country code
+              — the same AR-EG shorthand the slate stamps when the job is sent. */}
           {job.language}
+          {job.country && <span className="tabular-nums">· {job.country}</span>}
           <span className="h-2 w-px bg-rule" />
           <span suppressHydrationWarning>{loggedAt(job.createdAt)}</span>
         </p>

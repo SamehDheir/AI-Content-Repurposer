@@ -40,7 +40,12 @@ export class JobsController {
   @UseGuards(AuthGuard('jwt'))
   create(@Body() body: CreateJobDto, @Req() req: Request) {
     const user = req.user as { id: string };
-    return this.jobsService.initiateJob(body.videoUrl, user.id, body.language);
+    return this.jobsService.initiateJob(
+      body.videoUrl,
+      user.id,
+      body.language,
+      body.country,
+    );
   }
 
   @Get()
@@ -94,6 +99,7 @@ export class JobsController {
       return this.imageService.generateImageFromContent(
         body.content,
         body.contentType,
+        { country: body.country },
       );
     }
     return this.imageService.generateImage(body.prompt!);
@@ -116,17 +122,27 @@ export class JobsController {
       );
     }
 
-    // Get transcript from blog post content
-    const blogContent = job.generatedContent.find(
-      (c) => c.type === 'BLOG_POST',
+    const blog = job.generatedContent.find((c) => c.type === 'BLOG_POST');
+    const highlights = job.generatedContent.find(
+      (c) => c.type === 'HIGHLIGHTS',
     );
-    if (!blogContent) {
-      throw new NotFoundException('No blog content found for this job');
+
+    if (!blog && !highlights) {
+      throw new NotFoundException('No content found for this job');
     }
 
+    // Highlights are the same video reduced to its key moments, so pairing them
+    // with the blog states the topic twice in two different shapes. That is the
+    // signal the prompt model needs to land on the actual subject instead of
+    // illustrating whatever the opening paragraph happened to mention.
+    const source = [blog?.body, highlights?.body].filter(Boolean).join('\n\n');
+
+    // The job already knows who it was written for, so the illustration is set
+    // in the same place as the post.
     const imageUrl = await this.imageService.generateImageFromContent(
-      blogContent.body,
+      source,
       'BLOG_POST',
+      { country: job.country },
     );
 
     // Update job with imageUrl

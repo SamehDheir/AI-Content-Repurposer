@@ -40,6 +40,8 @@ export interface JobSummary {
   videoUrl: string;
   status: JobStatus;
   language: string;
+  /** ISO-2 country whose dialect was targeted. Null means Modern Standard. */
+  country?: string | null;
   createdAt: string;
   imageUrl?: string;
   generatedContent: { type: ContentType }[];
