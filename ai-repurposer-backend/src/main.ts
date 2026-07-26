@@ -54,6 +54,11 @@ async function bootstrap() {
     allowedHeaders: 'Content-Type, Accept',
   });
 
+  // Without this, SIGTERM kills the process outright: PrismaService and
+  // RedisService never run onModuleDestroy, and the BullMQ worker is never
+  // drained, so a deploy tears down whatever job was mid-transcription.
+  app.enableShutdownHooks();
+
   await app.listen(process.env.PORT ?? 3001);
 }
 void bootstrap();

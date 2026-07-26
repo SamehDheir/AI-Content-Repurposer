@@ -62,7 +62,15 @@ export class JobsService {
       await this.repurposeQueue.add(
         'process-video',
         { jobId: job.id, videoUrl, language, country: dialect },
-        { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          // Postgres is the record of what happened; Redis only needs the work
+          // in flight. Without these, every job ever run stayed in Redis
+          // forever — the completed and failed sets grew without bound.
+          removeOnComplete: { age: 3600, count: 100 },
+          removeOnFail: { age: 24 * 3600, count: 500 },
+        },
       );
 
       return job;

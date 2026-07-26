@@ -63,7 +63,12 @@ export class TranscriptionService implements OnModuleInit {
     }
   }
 
-  async getTranscript(videoUrl: string): Promise<string> {
+  /**
+   * `attempt` is BullMQ's 1-based attempt number. From the second attempt on,
+   * audio already on disk from the previous one is reused instead of pulled
+   * again — the processor only deletes it once no further attempt is coming.
+   */
+  async getTranscript(videoUrl: string, attempt = 1): Promise<string> {
     const videoId = extractVideoId(videoUrl);
     if (!videoId)
       throw new BadRequestException('Invalid YouTube URL or video ID');
@@ -83,13 +88,7 @@ export class TranscriptionService implements OnModuleInit {
     }
 
     this.logger.log('🎙️ Falling back to Whisper transcription...');
-    return await this.transcribeWithWhisper(videoId, 1);
-  }
-
-  // Takes the extracted id rather than the URL: the caller's string never
-  // reaches the subprocess, so there is nothing to escape.
-  async retryTranscription(videoId: string, attempt: number): Promise<string> {
-    return await this.transcribeWithWhisper(videoId, attempt, true);
+    return await this.transcribeWithWhisper(videoId, attempt, attempt > 1);
   }
 
   async cleanupAudioFile(videoId: string): Promise<void> {
@@ -127,75 +126,66 @@ export class TranscriptionService implements OnModuleInit {
   ): Promise<string> {
     const tmpFile = path.join(os.tmpdir(), `yt-audio-${videoId}.webm`);
 
-    try {
-      if (!useExistingFile || !fs.existsSync(tmpFile)) {
-        this.logger.log(`⬇️ Downloading audio via yt-dlp (no ffmpeg)...`);
+    // No try/finally here any more. Deleting the audio used to be split between
+    // this method and JobsProcessor, with two different notions of "last
+    // attempt". The processor now owns the file's lifetime outright: it keeps
+    // it between attempts and deletes it on success or on the final failure.
+    if (!useExistingFile || !fs.existsSync(tmpFile)) {
+      this.logger.log(`⬇️ Downloading audio via yt-dlp (no ffmpeg)...`);
 
-        // One argv entry per argument. The quotes that used to wrap the format
-        // selector and the paths were shell quoting and must not survive here —
-        // execFile passes each element through verbatim.
-        //
-        // The runtime is named `node`, not `nodejs`. yt-dlp does not fail on an
-        // unknown name — it warns, drops the runtime, and then cannot extract
-        // from YouTube at all, reporting the misleading "This video is not
-        // available" for videos that are perfectly available.
-        await execFileAsync(
-          'yt-dlp',
-          [
-            '--js-runtimes',
-            'node',
-            '-f',
-            'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
-            '--no-playlist',
-            '-o',
-            tmpFile,
-            canonicalUrl(videoId),
-          ],
-          { timeout: DOWNLOAD_TIMEOUT_MS },
+      // One argv entry per argument. The quotes that used to wrap the format
+      // selector and the paths were shell quoting and must not survive here —
+      // execFile passes each element through verbatim.
+      //
+      // The runtime is named `node`, not `nodejs`. yt-dlp does not fail on an
+      // unknown name — it warns, drops the runtime, and then cannot extract
+      // from YouTube at all, reporting the misleading "This video is not
+      // available" for videos that are perfectly available.
+      await execFileAsync(
+        'yt-dlp',
+        [
+          '--js-runtimes',
+          'node',
+          '-f',
+          'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
+          '--no-playlist',
+          '-o',
+          tmpFile,
+          canonicalUrl(videoId),
+        ],
+        { timeout: DOWNLOAD_TIMEOUT_MS },
+      );
+
+      const fileSizeMB = fs.statSync(tmpFile).size / (1024 * 1024);
+      this.logger.log(`📦 Audio size: ${fileSizeMB.toFixed(1)} MB`);
+
+      if (fileSizeMB > 24) {
+        throw new Error(
+          `Audio too large: ${fileSizeMB.toFixed(1)}MB (max 24MB)`,
         );
-
-        const fileSizeMB = fs.statSync(tmpFile).size / (1024 * 1024);
-        this.logger.log(`📦 Audio size: ${fileSizeMB.toFixed(1)} MB`);
-
-        if (fileSizeMB > 24) {
-          throw new Error(
-            `Audio too large: ${fileSizeMB.toFixed(1)}MB (max 24MB)`,
-          );
-        }
-      } else {
-        this.logger.log(`📁 Using existing audio file (attempt ${attempt})`);
       }
-
-      this.logger.log(`📤 Sending to Groq Whisper (attempt ${attempt})...`);
-
-      const transcription = await this.groq.audio.transcriptions.create({
-        file: fs.createReadStream(tmpFile),
-        model: 'whisper-large-v3-turbo',
-        response_format: 'text',
-      });
-
-      const result =
-        typeof transcription === 'string'
-          ? transcription
-          : ((transcription as any).text ?? '');
-
-      if (!result || result.trim().length < 20) {
-        throw new Error('Whisper returned empty transcript');
-      }
-
-      this.logger.log(`✅ Whisper done. Length: ${result.length} chars`);
-      return result.trim();
-    } finally {
-      // Only delete file on success or after max attempts
-      if (useExistingFile && attempt >= 3) {
-        if (fs.existsSync(tmpFile)) {
-          fs.unlinkSync(tmpFile);
-          this.logger.log(`🗑️ Audio file deleted after ${attempt} attempts`);
-        }
-      } else if (!useExistingFile) {
-        // First attempt - keep file for potential retry
-        this.logger.log(`📁 Keeping audio file for potential retry`);
-      }
+    } else {
+      this.logger.log(`📁 Reusing audio from a previous attempt`);
     }
+
+    this.logger.log(`📤 Sending to Groq Whisper (attempt ${attempt})...`);
+
+    const transcription = await this.groq.audio.transcriptions.create({
+      file: fs.createReadStream(tmpFile),
+      model: 'whisper-large-v3-turbo',
+      response_format: 'text',
+    });
+
+    const result =
+      typeof transcription === 'string'
+        ? transcription
+        : ((transcription as any).text ?? '');
+
+    if (!result || result.trim().length < 20) {
+      throw new Error('Whisper returned empty transcript');
+    }
+
+    this.logger.log(`✅ Whisper done. Length: ${result.length} chars`);
+    return result.trim();
   }
 }
