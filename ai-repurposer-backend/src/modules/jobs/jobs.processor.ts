@@ -72,7 +72,6 @@ export class JobsProcessor extends WorkerHost {
               await this.transcriptionService.getTranscript(videoUrl);
           } else {
             transcript = await this.transcriptionService.retryTranscription(
-              videoUrl,
               videoId,
               attempt,
             );

@@ -57,6 +57,8 @@ Migration history is a single squashed baseline (`20260723140000_init`) that rep
 
 Prisma 7: `schema.prisma` has **no `url` in the datasource block** — the connection string comes from [prisma.config.ts](ai-repurposer-backend/prisma.config.ts), which loads `DATABASE_URL` via dotenv. At runtime `PrismaService` uses the `@prisma/adapter-pg` driver adapter rather than the Rust engine's own connection handling.
 
+**Never use `exec` in this codebase — only `execFile` with an argv array.** `TranscriptionService` used to build its yt-dlp command by interpolating the job's `videoUrl` into a string handed to `sh -c`, and `CreateJobDto`'s URL regex was anchored only at the *start*, so everything after the 11-character video id went unchecked. `@IsUrl` does not cover it either, because validator.js strips the query and fragment before it looks. `https://youtu.be/<11 chars>$(...)` therefore satisfied both validators and reached the shell: **authenticated remote code execution**, replayed from `job.data` on every BullMQ retry. Three independent defences now stand: `execFile` (no shell at all), the regex anchored at both ends with shell metacharacters excluded, and `transcribeWithWhisper` taking the extracted *video id* and rebuilding a canonical URL, so the caller's string never reaches the subprocess. Keep all three — `create-job.dto.spec.ts` pins the payloads.
+
 Transcription fallback shells out to **`yt-dlp`**, which must be on `PATH`. Without it, only videos that already have YouTube captions will process — `TranscriptionService.onModuleInit` logs a warning at boot if it is missing. The backend Docker image installs it along with Python.
 
 YouTube extraction now needs a JavaScript runtime, so the command passes `--js-runtimes node`. **The runtime is `node`, not `nodejs`** — yt-dlp does not reject an unknown name, it warns, silently drops the runtime, and then fails every video with `ERROR: [youtube] <id>: This video is not available`, which looks like a dead or private video rather than a local misconfiguration. If transcription starts failing wholesale, check for `Ignoring unsupported JavaScript runtime(s)` in the log first, and confirm by hand:
@@ -161,7 +163,17 @@ Two independent mechanisms, easy to confuse:
 - **Plan quota** — Redis key `usage:{userId}:{YYYY-MM}` (see [plans.config.ts](ai-repurposer-backend/src/common/config/plans.config.ts)), expiring at the start of next month UTC. `FREE` = 1 job/month, `PRO` = `Infinity`. Claimed by `UsageService.tryConsume` from inside `JobsService`, reported by `GET /users/me`. The `User.jobsUsedThisMonth`/`usagePeriodStart` columns exist in the schema but are **not used** — Redis is the source of truth, so quota resets if Redis is flushed.
 
   Enforcement deliberately lives in the service, **not** a guard: Nest runs guards before pipes, so a guard would burn a user's monthly slot on requests that the `ValidationPipe` is about to reject. `tryConsume` runs INCR, the TTL and the limit check in one Lua script so concurrent requests cannot both observe the pre-increment value, and it lets Redis errors propagate so the endpoint fails closed.
-- **Rate limiting** — `@nestjs/throttler`, global 10/min + 100/hr, with tighter `@Throttle` overrides on register (3/min), login (5/min), job creation (5/min), and image generation (5–10/min).
+- **Rate limiting** — `@nestjs/throttler`, global 10/min + 100/hr, with tighter `@Throttle` overrides on register (3/min), login (5/min), job creation (5/min), image generation (5/min), verify-email (10/min) and reset-password (5/min).
+
+  **Two things have to be right or this silently does nothing, and both were wrong.** Importing `ThrottlerModule` only *configures* throttling — enforcement needs `{ provide: APP_GUARD, useClass: ThrottlerGuard }` in `app.module.ts`. Without it no limit runs at all and every `@Throttle` is decorative; login was unlimited. And each entry in `forRoot([...])` **must be named**: two unnamed entries both register as `default`, so one request increments that counter twice and every limit is halved — measured, a 5/min login limit rejected the *third* attempt. Verify by hand after touching either, since neither failure is visible from the code:
+
+  ```bash
+  for i in $(seq 1 7); do curl -s -o /dev/null -w "%{http_code}\n" \
+    -X POST localhost:3001/auth/login -H 'Content-Type: application/json' \
+    -d '{"email":"nobody@example.com","password":"wrong"}'; done   # five 401s, then 429
+  ```
+
+  The throttler keys on client IP, so behind a proxy every user shares one bucket. `TRUST_PROXY=true` switches to `X-Forwarded-For` — set it **only** when something really does terminate in front of the app, because with no proxy present anyone can forge that header and get a fresh bucket per request.
 
 ## Conventions and gotchas
 
@@ -190,7 +202,8 @@ The marketing page, the dashboard and the auth pages share one system defined in
 - **Motion** lives in `cr-*` keyframes in globals.css and is applied via inline `style={{ animation: … }}` or the `.anim-*` helpers. Scroll reveals go through `<Reveal>` / `useReveal`, which shares one IntersectionObserver across the page. Everything is disabled under `prefers-reduced-motion`.
 - Corners are square (or ≤2px), depth is a hard offset shadow (`.plate`, or `shadow-[4px_4px_0_var(--rule-strong)]`) rather than a blur, and `.hatch` / `.gridlines` / `.regmark` supply the print furniture.
 - `layout.tsx` runs a pre-paint inline script that sets the theme class before React hydrates; without it the whole page flashes in the wrong theme.
-- Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer. Optional: `OPENROUTER_MODEL` overrides the writing model.
+- Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer. Optional: `OPENROUTER_MODEL` overrides the writing model, `OPENROUTER_IMAGE_MODEL` the image-prompt model, `TRUST_PROXY=true` when a reverse proxy fronts the app.
+  - [env.validation.ts](ai-repurposer-backend/src/common/config/env.validation.ts) runs from `ConfigModule.forRoot({ validate })` and **fails the boot** on a missing `DATABASE_URL` / `JWT_SECRET` / `JWT_REFRESH_SECRET`, on a secret under 16 characters, or on the two JWT secrets being identical (which would let a 15-minute access token be replayed as a 7-day refresh token). Everything else warns. Previously `JwtModule.register({ secret: undefined })` built happily and only failed at the first login, as an opaque 500.
 - Adding a `ContentType` requires changes in four places: the Prisma enum, `CONTENT_TYPES` in the processor, `PROMPTS` in `ai.service.ts`, and the frontend `TABS`/content components.
 - Adding a country to the dialect picker requires two: `DIALECTS` in `dialects.config.ts` (backend, with markers and register) and `DIALECT_GROUPS` in `lib/dialects.ts` (frontend, display only).
 - `extractVideoId` lives in `src/common/utils/youtube.util.ts`. `JobsProcessor` and `TranscriptionService` both call it — do not re-inline a copy, which is how it drifted before.

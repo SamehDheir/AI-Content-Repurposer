@@ -102,7 +102,11 @@ export class AuthController {
   }
 
   // ── Email Verification ────────────────────────────────
+  // Token-guessing surface. The tokens are 256-bit random, so a limit is not
+  // what makes guessing infeasible — but an unlimited unauthenticated endpoint
+  // is still free load, and this one hits the database on every call.
   @Post('verify-email')
+  @Throttle({ default: { limit: 10, ttl: 60000 } }) // 10 attempts per minute
   async verifyEmail(@Body() body: VerifyEmailDto) {
     return this.authService.verifyEmail(body.token);
   }
@@ -120,7 +124,10 @@ export class AuthController {
     return this.authService.requestPasswordReset(body.email);
   }
 
+  // The only endpoint that changes a password without proving the old one, and
+  // it was the sole auth route with no limit at all.
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 attempts per minute
   async resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body.token, body.password);
   }
