@@ -1,7 +1,7 @@
 "use client";
 import { useState, lazy, Suspense } from "react";
 import { useJobs } from "@/features/jobs/useJobs";
-import { api, type Job } from "@/lib/api";
+import { api, type JobSummary } from "@/lib/api";
 import { DeskRail, DeskHeader } from "@/components/dashboard/DeskChrome";
 import { Slate } from "@/components/dashboard/Slate";
 import { Waveform } from "@/components/ui/Waveform";
@@ -30,7 +30,7 @@ function RowSkeleton() {
 
 export default function DashboardPage() {
   const { jobs, loading, error, refetch, updateJob } = useJobs();
-  const [selected, setSelected] = useState<Job | null>(null);
+  const [selected, setSelected] = useState<JobSummary | null>(null);
 
   const signOut = async () => {
     // The cookies are HttpOnly, so only the server can clear them.
@@ -122,7 +122,10 @@ export default function DashboardPage() {
             </div>
           }
         >
+          {/* Keyed so opening a different take starts a clean sheet — it
+              fetches its own content, and stale bodies must not show through. */}
           <ContentViewer
+            key={selected.id}
             job={selected}
             onClose={() => setSelected(null)}
             onJobUpdate={(updated) => {

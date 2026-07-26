@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Reveal } from "@/components/ui/Reveal";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
 import { SectionHead } from "./SectionHead";
 
 const MONO = "var(--font-geist-mono), ui-monospace, monospace";
@@ -32,10 +33,16 @@ const STAGES = [
   },
 ];
 
-/** 0…1 for how far the reader has travelled through the rail. */
+/**
+ * How far the reader has travelled through the rail, written as 0…1 into
+ * `--rail-progress` on the rail container.
+ *
+ * As React state this re-rendered the entire section — four stages, four
+ * figures and every animated rect inside them — on each frame of a scroll, all
+ * to move one `scaleY`. Setting the variable through the ref keeps it out of
+ * React entirely.
+ */
 function useRailProgress(ref: React.RefObject<HTMLElement | null>) {
-  const [p, setP] = useState(0);
-
   useEffect(() => {
     let frame = 0;
     const read = () => {
@@ -44,7 +51,8 @@ function useRailProgress(ref: React.RefObject<HTMLElement | null>) {
       if (!el) return;
       const { top, height } = el.getBoundingClientRect();
       const mid = window.innerHeight * 0.62;
-      setP(Math.max(0, Math.min(1, (mid - top) / height)));
+      const p = Math.max(0, Math.min(1, (mid - top) / height));
+      el.style.setProperty("--rail-progress", p.toFixed(4));
     };
     const onScroll = () => {
       frame ||= requestAnimationFrame(read);
@@ -58,14 +66,16 @@ function useRailProgress(ref: React.RefObject<HTMLElement | null>) {
       window.removeEventListener("resize", onScroll);
     };
   }, [ref]);
-
-  return p;
 }
 
 function Figure({ stage }: { stage: number }) {
+  // Each figure is a dozen-odd infinite animations and only one or two of the
+  // four stages are ever on screen, so each gates its own.
+  const gate = useMotionGate<SVGSVGElement>();
+
   if (stage === 0)
     return (
-      <svg viewBox="0 0 160 64" className="w-full">
+      <svg ref={gate} viewBox="0 0 160 64" className="w-full">
         <rect x="1" y="16" width="158" height="32" fill="none" stroke="var(--rule)" />
         <text x="10" y="36" fill="var(--ink-3)" fontFamily={MONO} fontSize="9">
           youtube.com/watch?v=
@@ -79,7 +89,7 @@ function Figure({ stage }: { stage: number }) {
 
   if (stage === 1)
     return (
-      <svg viewBox="0 0 160 64" className="w-full">
+      <svg ref={gate} viewBox="0 0 160 64" className="w-full">
         {Array.from({ length: 16 }, (_, i) => {
           const h = 6 + (Math.abs(Math.sin(i * 0.9)) * 34);
           return (
@@ -119,7 +129,7 @@ function Figure({ stage }: { stage: number }) {
 
   if (stage === 2)
     return (
-      <svg viewBox="0 0 160 64" className="w-full">
+      <svg ref={gate} viewBox="0 0 160 64" className="w-full">
         {["--fmt-thread", "--fmt-blog", "--fmt-social", "--fmt-marks"].map((c, i) => (
           <g key={c}>
             <rect x="2" y={8 + i * 13} width="156" height="6" fill="var(--rule)" />
@@ -141,7 +151,7 @@ function Figure({ stage }: { stage: number }) {
     );
 
   return (
-    <svg viewBox="0 0 160 64" className="w-full">
+    <svg ref={gate} viewBox="0 0 160 64" className="w-full">
       <rect x="1" y="10" width="158" height="44" fill="none" stroke="var(--rule)" />
       <circle cx="16" cy="32" r="4" fill="var(--fmt-social)" className="anim-pulse" />
       <text x="28" y="29" fill="var(--ink-2)" fontFamily={MONO} fontSize="9">
@@ -157,7 +167,7 @@ function Figure({ stage }: { stage: number }) {
 
 export function Pipeline() {
   const rail = useRef<HTMLDivElement>(null);
-  const progress = useRailProgress(rail);
+  useRailProgress(rail);
 
   return (
     <section id="pipeline" className="scroll-mt-20 border-b border-rule py-20 sm:py-28">
@@ -180,7 +190,7 @@ export function Pipeline() {
           <div className="absolute bottom-0 left-0 top-0 w-px bg-rule sm:left-6" aria-hidden="true">
             <div
               className="w-full origin-top bg-signal"
-              style={{ height: "100%", transform: `scaleY(${progress})` }}
+              style={{ height: "100%", transform: "scaleY(var(--rail-progress, 0))" }}
             />
           </div>
 

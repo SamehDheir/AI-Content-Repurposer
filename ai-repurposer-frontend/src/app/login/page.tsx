@@ -328,8 +328,10 @@ export default function LoginPage() {
         </div>
 
         <div className="px-10 pb-10">
+          {/* 40 bars at 30% opacity reads the same as 72 and costs 32 fewer
+              infinite animations on the page that gates every session. */}
           <Waveform
-            bars={72}
+            bars={40}
             live
             playhead
             color="var(--paper)"

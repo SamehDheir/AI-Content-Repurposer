@@ -3,6 +3,17 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 /** Endpoints that must not trigger a refresh-and-retry on 401. */
 const NO_RETRY = ["/auth/login", "/auth/register", "/auth/refresh"];
 
+export interface RequestOptions extends RequestInit {
+  /**
+   * Treat a 401 as the answer rather than an expired token.
+   *
+   * Per call rather than per path: `/users/me` needs the refresh on the
+   * dashboard, where a 401 really does mean the 15-minute access token lapsed,
+   * but not when the marketing page is only asking whether anyone is signed in.
+   */
+  noRetry?: boolean;
+}
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -51,14 +62,15 @@ function refreshSession(): Promise<boolean> {
 
 export async function request<T>(
   path: string,
-  options?: RequestInit,
+  options?: RequestOptions,
 ): Promise<T> {
-  let res = await send(path, options);
+  const { noRetry, ...init } = options ?? {};
+  let res = await send(path, init);
 
   // The access token lives ~15 minutes; on expiry, refresh once and replay.
-  if (res.status === 401 && !NO_RETRY.includes(path)) {
+  if (res.status === 401 && !noRetry && !NO_RETRY.includes(path)) {
     if (await refreshSession()) {
-      res = await send(path, options);
+      res = await send(path, init);
     }
   }
 

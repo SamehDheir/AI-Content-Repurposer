@@ -1,9 +1,9 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { api, type Job } from '@/lib/api';
+import { api, type JobSummary } from '@/lib/api';
 
 export function useJobs() {
-  const [jobs, setJobs]       = useState<Job[]>([]);
+  const [jobs, setJobs]       = useState<JobSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -21,7 +21,7 @@ export function useJobs() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
 
-  const updateJob = useCallback((updated: Job) => {
+  const updateJob = useCallback((updated: JobSummary) => {
     setJobs((prev) =>
       prev.map((j) => (j.id === updated.id ? updated : j)),
     );

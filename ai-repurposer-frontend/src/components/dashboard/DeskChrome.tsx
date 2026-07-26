@@ -1,9 +1,34 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { LogOut } from "lucide-react";
 import { Mark } from "@/components/brand/Mark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
+/**
+ * Lucide's `log-out`, inlined. It was the only icon imported from the package
+ * anywhere in the app, which is a whole dependency for one 13px glyph — the
+ * geometry is lucide's, so it draws identically.
+ */
+function SignOutIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </svg>
+  );
+}
 
 /** Wall clock in the rail, in the same 24h form as the job timecodes. */
 function Timecode() {
@@ -55,7 +80,7 @@ export function DeskRail({ onSignOut }: { onSignOut: () => void }) {
             aria-label="Sign out"
             title="Sign out"
           >
-            <LogOut size={13} />
+            <SignOutIcon />
           </button>
         </div>
       </aside>
@@ -74,7 +99,7 @@ export function DeskRail({ onSignOut }: { onSignOut: () => void }) {
             className="flex h-8 w-8 items-center justify-center border border-rule text-ink-3"
             aria-label="Sign out"
           >
-            <LogOut size={13} />
+            <SignOutIcon />
           </button>
         </div>
       </div>

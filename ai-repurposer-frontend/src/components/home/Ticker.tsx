@@ -1,3 +1,6 @@
+"use client";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
+
 const PIECES = [
   "Twitter thread",
   "Blog post",
@@ -33,6 +36,10 @@ function Row({
   reverse?: boolean;
   className?: string;
 }) {
+  // A marquee is one transform, but it is a transform on a ~4000px-wide layer
+  // that never stops. Off screen it is pure cost.
+  const gate = useMotionGate<HTMLDivElement>();
+
   const half = Array.from({ length: REPEATS }, (_, i) => (
     <span key={i} className="flex shrink-0 items-center">
       {children}
@@ -40,7 +47,7 @@ function Row({
   ));
 
   return (
-    <div className={`overflow-hidden ${className}`}>
+    <div ref={gate} className={`overflow-hidden ${className}`}>
       <div
         className="anim-marquee flex w-max items-center"
         style={{

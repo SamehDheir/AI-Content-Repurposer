@@ -3,6 +3,15 @@ import { Geist, Geist_Mono, Newsreader } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
+// `subsets` controls *preloading only* — it does not reduce what is downloaded.
+// Next fetches and self-hosts every file in the Google CSS regardless (see
+// findFontFilesInCss: subsets just sets preloadFontFile), which is why the build
+// carries 17 woff2 files for three families. Only four are preloaded — one latin
+// file per family and style, ~171KB — and the other thirteen (latin-ext,
+// vietnamese, cyrillic) are never requested by a browser that renders no
+// codepoint in their unicode-range. Getting to genuinely latin-only would mean
+// next/font/local with the woff2 files committed, which saves build output and
+// no user bytes at all.
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -17,6 +26,12 @@ const geistMono = Geist_Mono({
 // numerals — is set in this; the mono carries the labels and timecodes.
 // Newsreader rather than a high-contrast display serif: its hairlines survive
 // at small sizes and on dark backgrounds, where a Didone-style face goes faint.
+//
+// The italic is the largest single font file the site loads — 64.5KB, more than
+// the roman — and it is kept deliberately. It sets the `<em>` accent in the
+// headline of every page at 2.4–5rem, and a synthetic slant on a serif skews the
+// serifs while keeping roman letterforms, which is exactly the failure this face
+// was chosen to avoid.
 const displaySerif = Newsreader({
   variable: "--font-display-serif",
   subsets: ["latin"],

@@ -1,5 +1,5 @@
 "use client";
-import { type ContentType, type Job } from "@/lib/api";
+import { type ContentType, type JobSummary } from "@/lib/api";
 import { useJobSSE } from "@/features/jobs/useJobSSE";
 import { useScramble } from "@/lib/hooks/useScramble";
 import { thumbnailFor } from "@/lib/youtube";
@@ -27,8 +27,12 @@ function loggedAt(iso: string) {
   return then.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 
-/** The four (plus one) pieces a finished job carries. */
-function Pieces({ job }: { job: Job }) {
+/**
+ * The four (plus one) pieces a finished job carries. Only the *presence* of
+ * each format is drawn here, which is why the ledger query does not fetch the
+ * bodies — see `getMyJobs`.
+ */
+function Pieces({ job }: { job: JobSummary }) {
   const present = new Set(job.generatedContent.map((c) => c.type));
   return (
     <span className="flex items-center gap-1" title={`${present.size} of 4 formats`}>
@@ -52,10 +56,10 @@ function Pieces({ job }: { job: Job }) {
 }
 
 interface Props {
-  job: Job;
+  job: JobSummary;
   index: number;
-  onUpdate: (job: Job) => void;
-  onView: (job: Job) => void;
+  onUpdate: (job: JobSummary) => void;
+  onView: (job: JobSummary) => void;
 }
 
 export function JobCard({ job, index, onUpdate, onView }: Props) {

@@ -1,3 +1,6 @@
+"use client";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
+
 interface Props {
   bars?: number;
   className?: string;
@@ -26,8 +29,16 @@ export function Waveform({
   color = "var(--ink-3)",
   playheadColor = "var(--signal)",
 }: Props) {
+  // A live waveform is `bars` separate infinite animations, so it is gated —
+  // several of these sit in page furniture that is usually scrolled past.
+  const gate = useMotionGate<HTMLDivElement>(live || playhead);
+
   return (
-    <div className={`relative flex items-center gap-[2px] ${className}`} aria-hidden="true">
+    <div
+      ref={gate}
+      className={`relative flex items-center gap-[2px] ${className}`}
+      aria-hidden="true"
+    >
       {Array.from({ length: bars }, (_, i) => {
         const height = amplitude(i, bars);
         return (

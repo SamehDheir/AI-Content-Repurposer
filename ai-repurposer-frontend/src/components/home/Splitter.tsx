@@ -1,4 +1,5 @@
 "use client";
+import { useMotionGate } from "@/lib/hooks/useMotionGate";
 
 /**
  * The hero machine. One source on the left, the splitter node in the middle,
@@ -43,8 +44,13 @@ function RegMark({ x, y }: { x: number; y: number }) {
 }
 
 export function Splitter({ className = "" }: { className?: string }) {
+  // 34 waveform bars, four wire pulses, the ring and the blade — the densest
+  // piece of motion on the site, and the first thing you scroll away from.
+  const gate = useMotionGate<SVGSVGElement>();
+
   return (
     <svg
+      ref={gate}
       viewBox="0 0 640 460"
       className={`w-full h-auto ${className}`}
       role="img"

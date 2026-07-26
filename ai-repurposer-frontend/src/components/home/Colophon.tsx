@@ -21,7 +21,9 @@ export function Colophon({
           className="pointer-events-none absolute inset-x-0 bottom-0 h-40 opacity-[0.18]"
           aria-hidden="true"
         >
-          <Waveform bars={90} live playhead className="h-full w-full" />
+          {/* 44 rather than 90: at 18% opacity behind a headline, the extra bars
+              were an animation each and legible as none of them. */}
+          <Waveform bars={44} live playhead className="h-full w-full" />
         </div>
 
         <div className="relative mx-auto max-w-340 px-5 sm:px-8">

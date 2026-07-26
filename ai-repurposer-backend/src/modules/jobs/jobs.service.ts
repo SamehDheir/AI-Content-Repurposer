@@ -68,18 +68,37 @@ export class JobsService {
     }
   }
 
+  /**
+   * The ledger only needs to know *which* formats exist, so the bodies are
+   * deliberately left out — they are the whole payload. Twenty jobs × four
+   * pieces of generated prose was hundreds of KB of JSON per dashboard load,
+   * spent rendering twelve 10px squares. `ContentViewer` calls `getJob` for the
+   * one row the reader actually opens.
+   */
   async getMyJobs(userId: string) {
     return this.prisma.job.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: { generatedContent: { select: { type: true, body: true } } },
+      include: { generatedContent: { select: { type: true } } },
     });
   }
 
+  /** The full sheet, bodies included. Only `GET /jobs/:id` should use this. */
   async getJob(jobId: string, userId: string) {
     return this.prisma.job.findFirst({
       where: { id: jobId, userId },
       include: { generatedContent: true },
+    });
+  }
+
+  /**
+   * What the SSE stream sends on every tick. Same slim shape as the ledger, so
+   * a completing job does not push four bodies down the wire to flip a row.
+   */
+  async getJobStatus(jobId: string, userId: string) {
+    return this.prisma.job.findFirst({
+      where: { id: jobId, userId },
+      include: { generatedContent: { select: { type: true } } },
     });
   }
 
