@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { type Job, type ContentType, api } from "@/lib/api";
+import { type Job, type JobSummary, type ContentType, api } from "@/lib/api";
 import { TABS } from "./types";
 import { TwitterContent } from "./TwitterContent";
 import { BlogContent } from "./BlogContent";
@@ -8,15 +8,19 @@ import { FacebookContent } from "./FacebookContent";
 import { HighlightsContent } from "./HighlightsContent";
 
 interface Props {
-  job: Job;
+  job: JobSummary;
   onClose: () => void;
-  onJobUpdate?: (job: Job) => void;
+  onJobUpdate?: (job: JobSummary) => void;
 }
 
 /**
  * The layout sheet. Index tabs run down the left margin the way they would on a
  * folder of proofs; the sheet itself is plain paper so the generated copy is
  * the only thing with any colour on it.
+ *
+ * The ledger row it opens from carries no prose — only which formats exist — so
+ * the sheet fetches its own bodies. That keeps the dashboard's list response
+ * small no matter how many takes are in it, at the cost of one request here.
  */
 export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
   const [tab, setTab] = useState<ContentType>("TWITTER_THREAD");
@@ -27,9 +31,40 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
   const [zoomed, setZoomed] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(job.imageUrl ?? null);
   const [plateLoaded, setPlateLoaded] = useState(false);
+  const [full, setFull] = useState<Job | null>(null);
+  const [fetchError, setFetchError] = useState("");
+
+  // No state reset on the way in: the sheet is keyed by job id at the call site,
+  // so a different job is a different component instance with fresh state.
+  useEffect(() => {
+    let stale = false;
+
+    api
+      .getJob(job.id)
+      .then((fetched) => {
+        if (stale) return;
+        setFull(fetched);
+        if (fetched.imageUrl) setImageUrl(fetched.imageUrl);
+      })
+      .catch((err: unknown) => {
+        if (stale) return;
+        setFetchError(
+          err instanceof Error ? err.message : "Could not load this sheet.",
+        );
+      });
+
+    return () => {
+      stale = true;
+    };
+  }, [job.id]);
+
+  // Which tabs are selectable is known from the row itself, so the margin is
+  // right on the first paint; only the sheet waits on the bodies.
+  const formats = new Set(job.generatedContent.map((c) => c.type));
+  const loading = !full && !fetchError;
 
   const bodyOf = (t: ContentType) =>
-    edited[t] ?? job.generatedContent.find((c) => c.type === t)?.body ?? "";
+    edited[t] ?? full?.generatedContent.find((c) => c.type === t)?.body ?? "";
 
   const body = bodyOf(tab);
   const active = TABS.find((t) => t.key === tab)!;
@@ -114,7 +149,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
           aria-label="Formats"
         >
           {TABS.map((t) => {
-            const has = !!bodyOf(t.key);
+            const has = formats.has(t.key);
             const on = tab === t.key;
             return (
               <button
@@ -164,7 +199,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
           {/* ── Mobile tabs ── */}
           <div className="flex border-b border-rule sm:hidden">
             {TABS.map((t) => {
-              const has = !!bodyOf(t.key);
+              const has = formats.has(t.key);
               const on = tab === t.key;
               return (
                 <button
@@ -248,7 +283,19 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
             lang={lang}
             className="sheet min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-8"
           >
-            {!body ? (
+            {loading ? (
+              <div className="space-y-3 py-4" aria-label="Setting the sheet" aria-busy="true">
+                {[100, 96, 88, 98, 72, 94, 84].map((w, i) => (
+                  <span
+                    key={i}
+                    className="block h-3 animate-pulse bg-rule"
+                    style={{ width: `${w}%`, animationDelay: `${i * 90}ms` }}
+                  />
+                ))}
+              </div>
+            ) : fetchError ? (
+              <p className="label py-16 text-center text-signal">{fetchError}</p>
+            ) : !body ? (
               <p className="label py-16 text-center text-ink-3">Nothing was cut for this format.</p>
             ) : (
               <>
@@ -263,7 +310,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
           {/* ── Foot ── */}
           <footer className="flex flex-col gap-3 border-t border-rule px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between">
             <span className="label text-ink-3">
-              {body.length.toLocaleString()} characters set
+              {loading ? "Setting…" : `${body.length.toLocaleString()} characters set`}
             </span>
             <div className="flex gap-2">
               {!imageUrl && (
@@ -287,7 +334,8 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
               )}
               <button
                 onClick={copy}
-                className="label group flex h-10 items-center gap-2 bg-signal px-5 text-signal-ink transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_var(--rule-strong)]"
+                disabled={!body}
+                className="label group flex h-10 items-center gap-2 bg-signal px-5 text-signal-ink transition-all hover:-translate-y-0.5 hover:shadow-[3px_3px_0_var(--rule-strong)] disabled:translate-y-0 disabled:opacity-50 disabled:shadow-none"
               >
                 {copied ? "Copied ✓" : "Copy all"}
               </button>

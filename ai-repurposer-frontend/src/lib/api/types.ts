@@ -29,12 +29,23 @@ export interface GeneratedContent {
   body: string;
 }
 
-export interface Job {
+/**
+ * What the ledger and the status stream return. The generated prose is *not*
+ * included — a list of twenty jobs would otherwise ship every word of eighty
+ * pieces to draw a row of format dots. Open a sheet and `getJob` fetches the
+ * bodies for that one job.
+ */
+export interface JobSummary {
   id: string;
   videoUrl: string;
   status: JobStatus;
   language: string;
   createdAt: string;
   imageUrl?: string;
+  generatedContent: { type: ContentType }[];
+}
+
+/** One job with its content — `GET /jobs/:id` only. */
+export interface Job extends Omit<JobSummary, "generatedContent"> {
   generatedContent: GeneratedContent[];
 }

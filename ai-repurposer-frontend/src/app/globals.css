@@ -110,7 +110,9 @@ body {
   color: var(--ink);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  /* No `text-rendering: optimizeLegibility` — on a document this size it forces
+     kerning and ligature work over the whole page for a difference nobody can
+     see in Geist, and it is a known source of slow first paints. */
 }
 
 /* Paper grain. Fixed so it never scrolls with content — it is the substrate,
@@ -454,6 +456,15 @@ body::after {
   75% {
     transform: translate(1.5px, -1px);
   }
+}
+
+/* Off-screen decoration, parked by useMotionGate. `!important` is not
+   decoration here: the animations this has to stop are declared inline as the
+   `animation` shorthand, which resets play-state to `running` at inline
+   specificity, and an ordinary author rule would lose to it. */
+[data-motion="idle"],
+[data-motion="idle"] * {
+  animation-play-state: paused !important;
 }
 
 .anim-marquee {

@@ -57,6 +57,9 @@ model Job {
   imageUrl         String?
   generatedContent GeneratedContent[]
 
+  // The dashboard's only query is `where userId order by createdAt desc`, so it
+  // wants both columns in one index — `userId` alone would still leave a sort.
+  @@index([userId, createdAt])
   @@index([status])
   @@index([createdAt])
 }

@@ -15,7 +15,7 @@ const SECTIONS = [
 
 export function SiteHeader({ authed, onEnter }: { authed: boolean; onEnter: () => void }) {
   const router = useRouter();
-  const progress = useScrollProgress();
+  const readingBar = useScrollProgress<HTMLDivElement>();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<string>("");
 
@@ -43,10 +43,13 @@ export function SiteHeader({ authed, onEnter }: { authed: boolean; onEnter: () =
 
   return (
     <header className="fixed inset-x-0 top-0 z-50">
-      {/* How far down the issue you have read. */}
+      {/* How far down the issue you have read. The scale comes from a CSS
+          variable the hook writes directly, so scrolling does not re-render
+          this header. */}
       <div
+        ref={readingBar}
         className="h-[2px] origin-left bg-signal transition-transform duration-150 ease-out"
-        style={{ transform: `scaleX(${progress})` }}
+        style={{ transform: "scaleX(var(--scroll-progress, 0))" }}
       />
 
       <div className="border-b border-rule bg-paper/85 backdrop-blur-md">

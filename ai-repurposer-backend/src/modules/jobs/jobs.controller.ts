@@ -14,12 +14,19 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import type { Request } from 'express';
-import { Observable, interval } from 'rxjs';
-import { switchMap, takeWhile, map } from 'rxjs/operators';
+import { Observable, defer, timer } from 'rxjs';
+import { repeat, takeWhile, map } from 'rxjs/operators';
 import { JobsService } from './jobs.service';
 import { CreateJobDto } from './dto/create-job.dto';
 import { GenerateImageDto } from './dto/generate-image.dto';
 import { ImageService } from '@/modules/image/image.service';
+
+/** How long to wait before the next status query, by age of the stream. */
+function pollDelay(openFor: number): number {
+  if (openFor < 60_000) return 2_000;
+  if (openFor < 5 * 60_000) return 6_000;
+  return 20_000;
+}
 
 @Controller('jobs')
 export class JobsController {
@@ -54,6 +61,12 @@ export class JobsController {
 
   // Authenticated by the standard cookie guard. The token used to be passed as
   // a ?token= query parameter, which leaked it into access and proxy logs.
+  //
+  // This is still a database poll rather than a push — the worker does not
+  // notify anything, so replacing it properly means Redis pub/sub out of
+  // JobsProcessor. Until then the interval backs off: a typical job finishes
+  // inside the first minute, and everything after that is a tab someone left
+  // open on a slow or stuck video, which does not need a query every 2s.
   @Sse(':id/status')
   @UseGuards(AuthGuard('jwt'))
   streamJobStatus(
@@ -61,9 +74,10 @@ export class JobsController {
     @Req() req: Request,
   ): Observable<MessageEvent> {
     const { id: userId } = req.user as { id: string };
+    const openedAt = Date.now();
 
-    return interval(2000).pipe(
-      switchMap(() => this.jobsService.getJob(id, userId)),
+    return defer(() => this.jobsService.getJobStatus(id, userId)).pipe(
+      repeat({ delay: () => timer(pollDelay(Date.now() - openedAt)) }),
       takeWhile(
         (job) => job?.status !== 'COMPLETED' && job?.status !== 'FAILED',
         true,
