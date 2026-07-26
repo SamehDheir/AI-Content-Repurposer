@@ -113,8 +113,31 @@ Because the worker runs in the same Nest process as the API, there is no separat
 ### External services
 
 - **Transcription** ([transcription.service.ts](ai-repurposer-backend/src/modules/transcription/transcription.service.ts)): tries YouTube captions via `youtubei.js` first; falls back to downloading audio with `yt-dlp` into the OS temp dir and sending it to **Groq Whisper** (`whisper-large-v3-turbo`, 24 MB cap). The temp file is deliberately kept between retry attempts and cleaned up by the processor via `cleanupAudioFile`.
-- **Text generation** ([ai.service.ts](ai-repurposer-backend/src/modules/ai/ai.service.ts)): OpenAI SDK pointed at **OpenRouter** (`meta-llama/llama-3.1-8b-instruct`). Per-content-type prompts live in the `PROMPTS` map; the system prompt carries the target language (`Arabic` default, Modern Standard Arabic).
+- **Text generation** ([ai.service.ts](ai-repurposer-backend/src/modules/ai/ai.service.ts)): OpenAI SDK pointed at **OpenRouter**, model from `OPENROUTER_MODEL` (default `meta-llama/llama-3.1-8b-instruct`). Per-content-type prompts live in the `PROMPTS` map; the system prompt carries the language, the dialect and a block of anti-"this was written by AI" rules.
+
+  **The model is the ceiling on Arabic quality, not the prompt.** The default 8B obeys every constraint — measured across EG/MA/MSA it emitted no emoji, no em dashes and no hashtags — and still writes Arabic that is often ungrammatical, with Darija close to word salad. That is capacity, not prompting.
+
+  Measured on the same Egyptian thread (2026-07-26), all three clean of emoji/em dashes/hashtags:
+
+  | Model | In/Out per M | Egyptian Arabic |
+  |---|---|---|
+  | `meta-llama/llama-3.1-8b-instruct` (default) | $0.05 / $0.08 | Incoherent, and invents facts — reported the $3,800 figure as جنيه |
+  | `meta-llama/llama-3.3-70b-instruct` | $0.13 / $0.40 | Fluent but **mixes scripts mid-word**: `أtellك`, `تحtajَه`, and katakana in `الرーチ`. Disqualifying |
+  | `qwen/qwen-2.5-72b-instruct` | $0.36 / $0.40 | Fluent, idiomatic, every figure faithful to the transcript. **Recommended** |
+
+  Qwen works out around a cent per job across all four formats. The default is left on the 8B because switching is a billing decision — note that this account currently has little OpenRouter credit, and `google/gemini-2.5-flash` failed the same test with a 402.
+
+  Output is passed through `stripAiTells` ([sanitize.ts](ai-repurposer-backend/src/modules/ai/sanitize.ts)) on the way out, which removes emoji, keycaps, flags, ZWJ sequences and dingbats, converts spaced em dashes to commas, and strips chat preambles and code fences. It is covered by `sanitize.spec.ts`. Note that its regexes use alternation rather than character classes for the invisible joiners — `no-misleading-character-class` rejects them inside a class.
+- **Dialects** ([dialects.config.ts](ai-repurposer-backend/src/common/config/dialects.config.ts)): a job can name a target country, and the prompt switches to that country's spoken Arabic. Each profile carries marker vocabulary (question words, "want", "now", the negator) because a small model drifts back to MSA within a paragraph without concrete words to reach for. `Job.country` is null for Modern Standard, which is every job predating the column. The browser gets a **display-only** subset from [dialects.ts](ai-repurposer-frontend/src/lib/dialects.ts) — marker vocabulary is prompt-engineering and stays server-side. The backend is the authority on valid codes, so drift between the two lists surfaces as a 400, not as the wrong dialect.
 - **Images** ([image.service.ts](ai-repurposer-backend/src/modules/image/image.service.ts)): OpenRouter writes a Flux-style prompt, which is embedded in a **pollinations.ai** URL and then shortened through TinyURL. No image bytes are stored — only the URL on `Job.imageUrl`.
+
+  Two things here were silently broken until they were fixed, and both are easy to reintroduce. The prompt-writing call used `meta-llama/llama-3.3-8b-instruct:free`, which **does not exist** — there is no 8B in the 3.3 line — so every call 404'd and `fallbackPrompt` produced every image prompt the app ever used. And the style guide asked for `bold typography`, `magazine cover` and `infographic`, which are exactly the genres that make the model render mangled pseudo-text, the most obvious tell in a generated image. Every style is now a text-free photographic genre, `NO_TEXT` is appended to every prompt, and `enhance` is **off** — it is pollinations' own LLM rewrite, which undoes the prompt and likes to add the lettering `NO_TEXT` rules out.
+
+  **Measured against the live endpoint (2026-07-26), so do not go looking for quality in these knobs:**
+  - `model` is a **no-op**. `/models` offers only `sana`; `model=flux` and `model=sana` return a byte-identical image for the same seed. The parameter is kept only so the request is right if more models return.
+  - Resolution is **capped at 1024x576** for 16:9. Requesting 1280x720 and 1920x1080 both come back 1024x576. `width`/`height` choose the aspect ratio and nothing else.
+
+  So image quality is entirely a function of the prompt, which is why the prompt path is built the way it is. `condense` samples the title plus paragraphs from across the whole piece — it used to be `content.slice(0, 1500)`, the opening, which is the hook and says least about the subject. The model must answer `SUBJECT:` before `SCENE:`, which is logged and is the first thing to check when an image looks unrelated. `NO_ANATOMY` bans visible hands and faces because that is this model's most visible failure — a scene described only as "person typing at a desk" came back with a hand rendered as a blob of fingers. And `fallbackPrompt` takes **no words from the content**: it used to splice sentences into the prompt, so an Arabic post put Arabic script into the image prompt and the model rendered Arabic-looking gibberish across the picture.
 
 ### Auth
 
@@ -167,6 +190,7 @@ The marketing page, the dashboard and the auth pages share one system defined in
 - **Motion** lives in `cr-*` keyframes in globals.css and is applied via inline `style={{ animation: … }}` or the `.anim-*` helpers. Scroll reveals go through `<Reveal>` / `useReveal`, which shares one IntersectionObserver across the page. Everything is disabled under `prefers-reduced-motion`.
 - Corners are square (or ≤2px), depth is a hard offset shadow (`.plate`, or `shadow-[4px_4px_0_var(--rule-strong)]`) rather than a blur, and `.hatch` / `.gridlines` / `.regmark` supply the print furniture.
 - `layout.tsx` runs a pre-paint inline script that sets the theme class before React hydrates; without it the whole page flashes in the wrong theme.
-- Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer.
+- Both `.env` (backend) and `.env.local` (frontend) are committed-adjacent local files. Backend expects: `DATABASE_URL`, `REDIS_HOST`, `REDIS_PORT`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_CALLBACK_URL`, `FRONTEND_URL`, and `SMTP_*` for nodemailer. Optional: `OPENROUTER_MODEL` overrides the writing model.
 - Adding a `ContentType` requires changes in four places: the Prisma enum, `CONTENT_TYPES` in the processor, `PROMPTS` in `ai.service.ts`, and the frontend `TABS`/content components.
+- Adding a country to the dialect picker requires two: `DIALECTS` in `dialects.config.ts` (backend, with markers and register) and `DIALECT_GROUPS` in `lib/dialects.ts` (frontend, display only).
 - `extractVideoId` lives in `src/common/utils/youtube.util.ts`. `JobsProcessor` and `TranscriptionService` both call it — do not re-inline a copy, which is how it drifted before.

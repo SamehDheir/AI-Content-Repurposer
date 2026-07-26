@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { youtubeId } from "@/lib/youtube";
+import { DIALECT_GROUPS } from "@/lib/dialects";
 import { PENDING_URL_KEY } from "@/components/home/PasteField";
 
 const LANGUAGES = ["Arabic", "English"] as const;
@@ -15,6 +16,9 @@ type Language = (typeof LANGUAGES)[number];
 export function Slate({ take, onSent }: { take: number; onSent: () => void }) {
   const [url, setUrl] = useState("");
   const [lang, setLang] = useState<Language>("Arabic");
+  // "" is Modern Standard Arabic, the register the app wrote in before dialects
+  // existed. Kept across a switch to English and back, rather than reset.
+  const [country, setCountry] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [clapping, setClapping] = useState(false);
@@ -50,7 +54,7 @@ export function Slate({ take, onSent }: { take: number; onSent: () => void }) {
     setTimeout(() => setClapping(false), 700);
 
     try {
-      await api.createJob(value, lang);
+      await api.createJob(value, lang, lang === "Arabic" ? country : undefined);
       setUrl("");
       onSent();
     } catch (err) {
@@ -83,7 +87,7 @@ export function Slate({ take, onSent }: { take: number; onSent: () => void }) {
           ["Prod.", "AI Repurposer"],
           ["Date", today],
           ["Take", String(take).padStart(3, "0")],
-          ["Roll", lang === "Arabic" ? "AR" : "EN"],
+          ["Roll", lang === "Arabic" ? (country ? `AR-${country}` : "AR-MSA") : "EN"],
         ].map(([k, v], i) => (
           <div
             key={k}
@@ -135,30 +139,72 @@ export function Slate({ take, onSent }: { take: number; onSent: () => void }) {
         </div>
       </div>
 
-      {/* Language + action */}
+      {/* Language, dialect, action */}
       <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-end sm:justify-between sm:p-5">
-        <div>
-          <span className="label mb-3 block text-ink-3">Language</span>
-          <div className="relative inline-flex border border-rule">
-            <span
-              className="absolute inset-y-0 w-1/2 bg-ink transition-transform duration-300 ease-out"
-              style={{ transform: `translateX(${lang === "Arabic" ? "0%" : "100%"})` }}
-              aria-hidden="true"
-            />
-            {LANGUAGES.map((l) => (
-              <button
-                key={l}
-                type="button"
-                onClick={() => setLang(l)}
-                aria-pressed={lang === l}
-                className={`label relative z-10 h-10 w-24 transition-colors ${
-                  lang === l ? "text-paper" : "text-ink-3 hover:text-ink"
-                }`}
-              >
-                {l}
-              </button>
-            ))}
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-4">
+          <div>
+            <span className="label mb-3 block text-ink-3">Language</span>
+            <div className="relative inline-flex border border-rule">
+              <span
+                className="absolute inset-y-0 w-1/2 bg-ink transition-transform duration-300 ease-out"
+                style={{ transform: `translateX(${lang === "Arabic" ? "0%" : "100%"})` }}
+                aria-hidden="true"
+              />
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setLang(l)}
+                  aria-pressed={lang === l}
+                  className={`label relative z-10 h-10 w-24 transition-colors ${
+                    lang === l ? "text-paper" : "text-ink-3 hover:text-ink"
+                  }`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {/* Arabic is not one register, so the country decides which one gets
+              written. English has no equivalent choice here, so the control is
+              simply absent rather than disabled. */}
+          {lang === "Arabic" && (
+            <div>
+              <label htmlFor="slate-dialect" className="label mb-3 block text-ink-3">
+                Dialect
+              </label>
+              <div className="relative">
+                <select
+                  id="slate-dialect"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  // `bg-surface` rather than transparent: the closed face looks
+                  // identical against the plate, but the native option list
+                  // takes its background from the select and would otherwise
+                  // render white in the dark theme.
+                  className="slug h-10 w-full min-w-52 appearance-none border border-rule bg-surface pl-3 pr-9 text-[13px] text-ink outline-none transition-colors hover:border-rule-strong focus:border-signal"
+                >
+                  <option value="">Modern Standard</option>
+                  {DIALECT_GROUPS.map((group) => (
+                    <optgroup key={group.region} label={group.region}>
+                      {group.options.map((o) => (
+                        <option key={o.code} value={o.code}>
+                          {o.name} · {o.nameAr}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[9px] leading-none text-ink-3"
+                >
+                  ▼
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         <button

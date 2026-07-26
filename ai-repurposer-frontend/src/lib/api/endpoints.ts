@@ -42,10 +42,16 @@ export const api = {
 
   // A freshly queued job has no content yet, so this response carries the row
   // on its own — no `generatedContent` key at all.
-  createJob: (videoUrl: string, language: "Arabic" | "English") =>
+  // `country` picks the Arabic dialect to write in; omit it for Modern
+  // Standard. It is ignored for English, so the caller need not clear it.
+  createJob: (
+    videoUrl: string,
+    language: "Arabic" | "English",
+    country?: string,
+  ) =>
     request<Omit<JobSummary, "generatedContent">>("/jobs", {
       method: "POST",
-      body: JSON.stringify({ videoUrl, language }),
+      body: JSON.stringify({ videoUrl, language, country: country || undefined }),
     }),
 
   getMyJobs: () => request<JobSummary[]>("/jobs"),

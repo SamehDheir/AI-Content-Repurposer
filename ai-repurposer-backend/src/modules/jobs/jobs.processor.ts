@@ -33,9 +33,10 @@ export class JobsProcessor extends WorkerHost {
       jobId: string;
       videoUrl: string;
       language?: 'Arabic' | 'English';
+      country?: string | null;
     }>,
   ): Promise<void> {
-    const { jobId, videoUrl, language = 'Arabic' } = job.data;
+    const { jobId, videoUrl, language = 'Arabic', country = null } = job.data;
     const videoId = extractVideoId(videoUrl);
 
     if (!videoId) {
@@ -95,11 +96,10 @@ export class JobsProcessor extends WorkerHost {
       // Step 2: Generate all content types in parallel
       const results = await Promise.all(
         CONTENT_TYPES.map(async (type) => {
-          const body = await this.aiService.generateContent(
-            type,
-            transcript,
+          const body = await this.aiService.generateContent(type, transcript, {
             language,
-          );
+            country,
+          });
           return { type, body, jobId };
         }),
       );

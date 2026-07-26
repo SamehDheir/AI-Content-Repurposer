@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { type Job, type JobSummary, type ContentType, api } from "@/lib/api";
+import { dialectName } from "@/lib/dialects";
 import { TABS } from "./types";
 import { TwitterContent } from "./TwitterContent";
 import { BlogContent } from "./BlogContent";
@@ -182,6 +183,7 @@ export function ContentViewer({ job, onClose, onJobUpdate }: Props) {
               <span className="label flex items-center gap-2 text-ink-3">
                 <span className="h-1.5 w-1.5" style={{ background: active.ink }} />
                 Sheet {job.id.slice(0, 8).toUpperCase()} · {job.language}
+                {dialectName(job.country) ? ` (${dialectName(job.country)})` : ""}
               </span>
               <p className="slug mt-2 truncate text-[13px] text-ink-2">
                 {job.videoUrl.replace(/^https?:\/\/(www\.)?/, "")}

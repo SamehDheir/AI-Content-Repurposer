@@ -50,6 +50,10 @@ model Job {
   videoUrl         String
   status           JobStatus          @default(QUEUED)
   language         String             @default("Arabic")
+  // ISO-2 code of the country whose Arabic dialect the content was written in.
+  // Null means Modern Standard Arabic, which is what every job predating this
+  // column used. See src/common/config/dialects.config.ts.
+  country          String?
   createdAt        DateTime           @default(now())
   userId           String
   user             User               @relation(fields: [userId], references: [id])
